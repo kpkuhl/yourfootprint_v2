@@ -4,10 +4,8 @@ import { supabase } from '../utils/supabase';
 
 type FootprintData = {
   id: number;
-  category: string;
-  value: number | null;
-  unit: string;
-  created_at: string;
+  Sector: string;
+  CO2E: number;
 };
 
 export default function Home() {
@@ -24,13 +22,16 @@ export default function Home() {
       try {
         console.log('Attempting to fetch data from Supabase...');
         console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
+        console.log('Supabase Anon Key exists:', !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
         
         const { data, error } = await supabase
           .from('avg_monthly_us_household_footprint')
           .select('*')
           .order('id');
 
-        console.log('Supabase response:', { data, error });
+        console.log('Raw Supabase response:', { data, error });
+        console.log('Data length:', data?.length);
+        console.log('First row of data:', data?.[0]);
 
         if (error) {
           console.error('Supabase error:', error);
@@ -65,7 +66,7 @@ export default function Home() {
   }, []);
 
   const formatValue = (value: number | null) => {
-    if (value === null) return 'N/A';
+    if (value === null || value === undefined) return 'N/A';
     return value.toLocaleString();
   };
 
@@ -103,9 +104,9 @@ export default function Home() {
             <tbody>
               {footprintData.map((item) => (
                 <tr key={item.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 border-b">{item.category}</td>
-                  <td className="px-6 py-4 border-b text-right">{formatValue(item.value)}</td>
-                  <td className="px-6 py-4 border-b">{item.unit}</td>
+                  <td className="px-6 py-4 border-b">{item.Sector}</td>
+                  <td className="px-6 py-4 border-b text-right">{formatValue(item.CO2E)}</td>
+                  <td className="px-6 py-4 border-b">kg CO2e/month</td>
                 </tr>
               ))}
             </tbody>
