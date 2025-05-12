@@ -5,7 +5,7 @@ import { supabase } from '../utils/supabase';
 type FootprintData = {
   id: number;
   category: string;
-  value: number;
+  value: number | null;
   unit: string;
   created_at: string;
 };
@@ -44,6 +44,11 @@ export default function Home() {
     fetchData();
   }, []);
 
+  const formatValue = (value: number | null) => {
+    if (value === null) return 'N/A';
+    return value.toLocaleString();
+  };
+
   return (
     <main className="flex min-h-screen flex-col items-center p-24">
       <h1 className="text-4xl font-bold mb-8">US Household Carbon Footprint</h1>
@@ -77,7 +82,7 @@ export default function Home() {
               {footprintData.map((item) => (
                 <tr key={item.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 border-b">{item.category}</td>
-                  <td className="px-6 py-4 border-b text-right">{item.value.toLocaleString()}</td>
+                  <td className="px-6 py-4 border-b text-right">{formatValue(item.value)}</td>
                   <td className="px-6 py-4 border-b">{item.unit}</td>
                 </tr>
               ))}
