@@ -8,8 +8,13 @@ ChartJS.register(ArcElement, Tooltip, Legend);
 
 type FootprintData = {
   id: number;
-  Sector: string;
-  CO2E: number;
+  country: string;
+  transportation: number;
+  home_electricity: number;
+  home_natural_gas: number;
+  food: number;
+  water: number;
+  stuff: number;
 };
 
 export default function Home() {
@@ -31,11 +36,10 @@ export default function Home() {
         const { data, error } = await supabase
           .from('avg_monthly_us_household_footprint')
           .select('*')
-          .order('id');
+          .eq('country', 'United States')
+          .single();
 
         console.log('Raw Supabase response:', { data, error });
-        console.log('Data length:', data?.length);
-        console.log('First row of data:', data?.[0]);
 
         if (error) {
           console.error('Supabase error:', error);
@@ -44,7 +48,7 @@ export default function Home() {
         
         if (mounted) {
           console.log('Data received, updating state...');
-          setFootprintData(data || []);
+          setFootprintData(data ? [data] : []);
           setIsConnected(true);
         }
       } catch (error) {
@@ -74,11 +78,25 @@ export default function Home() {
     return value.toLocaleString();
   };
 
-  const chartData = {
-    labels: footprintData.map(item => item.Sector),
+  const chartData = footprintData.length > 0 ? {
+    labels: [
+      'Transportation',
+      'Home Electricity',
+      'Home Natural Gas',
+      'Food',
+      'Water',
+      'Stuff'
+    ],
     datasets: [
       {
-        data: footprintData.map(item => item.CO2E),
+        data: [
+          footprintData[0].transportation,
+          footprintData[0].home_electricity,
+          footprintData[0].home_natural_gas,
+          footprintData[0].food,
+          footprintData[0].water,
+          footprintData[0].stuff
+        ],
         backgroundColor: [
           '#FF6384',
           '#36A2EB',
@@ -98,7 +116,7 @@ export default function Home() {
         borderWidth: 1,
       },
     ],
-  };
+  } : null;
 
   const chartOptions = {
     plugins: {
@@ -137,7 +155,7 @@ export default function Home() {
         <div className="w-full max-w-6xl flex flex-col md:flex-row gap-8">
           <div className="w-full md:w-1/2">
             <div className="bg-white p-4 rounded-lg shadow">
-              <Pie data={chartData} options={chartOptions} />
+              {chartData && <Pie data={chartData} options={chartOptions} />}
             </div>
           </div>
           <div className="w-full md:w-1/2">
@@ -150,13 +168,36 @@ export default function Home() {
                 </tr>
               </thead>
               <tbody>
-                {footprintData.map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 border-b">{item.Sector}</td>
-                    <td className="px-6 py-4 border-b text-right">{formatValue(item.CO2E)}</td>
-                    <td className="px-6 py-4 border-b">kg CO2e/month</td>
-                  </tr>
-                ))}
+                <tr className="hover:bg-gray-50">
+                  <td className="px-6 py-4 border-b">Transportation</td>
+                  <td className="px-6 py-4 border-b text-right">{formatValue(footprintData[0].transportation)}</td>
+                  <td className="px-6 py-4 border-b">kg CO2e/month</td>
+                </tr>
+                <tr className="hover:bg-gray-50">
+                  <td className="px-6 py-4 border-b">Home Electricity</td>
+                  <td className="px-6 py-4 border-b text-right">{formatValue(footprintData[0].home_electricity)}</td>
+                  <td className="px-6 py-4 border-b">kg CO2e/month</td>
+                </tr>
+                <tr className="hover:bg-gray-50">
+                  <td className="px-6 py-4 border-b">Home Natural Gas</td>
+                  <td className="px-6 py-4 border-b text-right">{formatValue(footprintData[0].home_natural_gas)}</td>
+                  <td className="px-6 py-4 border-b">kg CO2e/month</td>
+                </tr>
+                <tr className="hover:bg-gray-50">
+                  <td className="px-6 py-4 border-b">Food</td>
+                  <td className="px-6 py-4 border-b text-right">{formatValue(footprintData[0].food)}</td>
+                  <td className="px-6 py-4 border-b">kg CO2e/month</td>
+                </tr>
+                <tr className="hover:bg-gray-50">
+                  <td className="px-6 py-4 border-b">Water</td>
+                  <td className="px-6 py-4 border-b text-right">{formatValue(footprintData[0].water)}</td>
+                  <td className="px-6 py-4 border-b">kg CO2e/month</td>
+                </tr>
+                <tr className="hover:bg-gray-50">
+                  <td className="px-6 py-4 border-b">Stuff</td>
+                  <td className="px-6 py-4 border-b text-right">{formatValue(footprintData[0].stuff)}</td>
+                  <td className="px-6 py-4 border-b">kg CO2e/month</td>
+                </tr>
               </tbody>
             </table>
           </div>
