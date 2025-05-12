@@ -17,31 +17,40 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let mounted = true;
+
     async function fetchData() {
       try {
-        // Test connection
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError) throw sessionError;
-        setIsConnected(true);
-
-        // Fetch footprint data
+        // Fetch footprint data directly without checking session first
         const { data, error } = await supabase
           .from('avg_monthly_us_household_footprint')
           .select('*')
           .order('id');
 
         if (error) throw error;
-        setFootprintData(data || []);
+        
+        if (mounted) {
+          setFootprintData(data || []);
+          setIsConnected(true);
+        }
       } catch (error) {
-        console.error('Error:', error);
-        setIsConnected(false);
-        setError(error instanceof Error ? error.message : 'An error occurred');
+        console.error('Error fetching data:', error);
+        if (mounted) {
+          setIsConnected(false);
+          setError(error instanceof Error ? error.message : 'An error occurred while fetching data');
+        }
       } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     }
 
     fetchData();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const formatValue = (value: number | null) => {
@@ -68,6 +77,8 @@ export default function Home() {
         <div className="text-lg">Loading data...</div>
       ) : error ? (
         <div className="text-red-500">Error: {error}</div>
+      ) : footprintData.length === 0 ? (
+        <div className="text-lg">No data available</div>
       ) : (
         <div className="w-full max-w-4xl">
           <table className="min-w-full bg-white border border-gray-300">
