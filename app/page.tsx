@@ -1,6 +1,10 @@
 'use client';
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../utils/supabase';
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
+import { Pie } from 'react-chartjs-2';
+
+ChartJS.register(ArcElement, Tooltip, Legend);
 
 type FootprintData = {
   id: number;
@@ -70,6 +74,44 @@ export default function Home() {
     return value.toLocaleString();
   };
 
+  const chartData = {
+    labels: footprintData.map(item => item.Sector),
+    datasets: [
+      {
+        data: footprintData.map(item => item.CO2E),
+        backgroundColor: [
+          '#FF6384',
+          '#36A2EB',
+          '#FFCE56',
+          '#4BC0C0',
+          '#9966FF',
+          '#FF9F40'
+        ],
+        borderColor: [
+          '#FF6384',
+          '#36A2EB',
+          '#FFCE56',
+          '#4BC0C0',
+          '#9966FF',
+          '#FF9F40'
+        ],
+        borderWidth: 1,
+      },
+    ],
+  };
+
+  const chartOptions = {
+    plugins: {
+      legend: {
+        position: 'right' as const,
+      },
+      title: {
+        display: true,
+        text: 'US Household Carbon Footprint by Sector',
+      },
+    },
+  };
+
   return (
     <main className="flex min-h-screen flex-col items-center p-24">
       <h1 className="text-4xl font-bold mb-8">US Household Carbon Footprint</h1>
@@ -92,25 +134,32 @@ export default function Home() {
       ) : footprintData.length === 0 ? (
         <div className="text-lg">No data available</div>
       ) : (
-        <div className="w-full max-w-4xl">
-          <table className="min-w-full bg-white border border-gray-300">
-            <thead>
-              <tr className="bg-gray-100">
-                <th className="px-6 py-3 border-b text-left">Category</th>
-                <th className="px-6 py-3 border-b text-right">Value</th>
-                <th className="px-6 py-3 border-b text-left">Unit</th>
-              </tr>
-            </thead>
-            <tbody>
-              {footprintData.map((item) => (
-                <tr key={item.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 border-b">{item.Sector}</td>
-                  <td className="px-6 py-4 border-b text-right">{formatValue(item.CO2E)}</td>
-                  <td className="px-6 py-4 border-b">kg CO2e/month</td>
+        <div className="w-full max-w-6xl flex flex-col md:flex-row gap-8">
+          <div className="w-full md:w-1/2">
+            <div className="bg-white p-4 rounded-lg shadow">
+              <Pie data={chartData} options={chartOptions} />
+            </div>
+          </div>
+          <div className="w-full md:w-1/2">
+            <table className="min-w-full bg-white border border-gray-300">
+              <thead>
+                <tr className="bg-gray-100">
+                  <th className="px-6 py-3 border-b text-left">Category</th>
+                  <th className="px-6 py-3 border-b text-right">Value</th>
+                  <th className="px-6 py-3 border-b text-left">Unit</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {footprintData.map((item) => (
+                  <tr key={item.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 border-b">{item.Sector}</td>
+                    <td className="px-6 py-4 border-b text-right">{formatValue(item.CO2E)}</td>
+                    <td className="px-6 py-4 border-b">kg CO2e/month</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </main>
