@@ -34,7 +34,7 @@ export default function Home() {
         console.log('Supabase Anon Key exists:', !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
         
         const { data, error } = await supabase
-          .from('avg_monthly_us_household_footprint')
+          .from('avg_monthly_household_footprint')
           .select('*')
           .eq('country', 'United States')
           .single();
