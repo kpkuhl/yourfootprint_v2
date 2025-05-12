@@ -17,30 +17,40 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    console.log('Component mounted, starting data fetch...');
     let mounted = true;
 
     async function fetchData() {
       try {
-        // Fetch footprint data directly without checking session first
+        console.log('Attempting to fetch data from Supabase...');
+        console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
+        
         const { data, error } = await supabase
           .from('avg_monthly_us_household_footprint')
           .select('*')
           .order('id');
 
-        if (error) throw error;
+        console.log('Supabase response:', { data, error });
+
+        if (error) {
+          console.error('Supabase error:', error);
+          throw error;
+        }
         
         if (mounted) {
+          console.log('Data received, updating state...');
           setFootprintData(data || []);
           setIsConnected(true);
         }
       } catch (error) {
-        console.error('Error fetching data:', error);
+        console.error('Error in fetchData:', error);
         if (mounted) {
           setIsConnected(false);
           setError(error instanceof Error ? error.message : 'An error occurred while fetching data');
         }
       } finally {
         if (mounted) {
+          console.log('Fetch complete, setting loading to false');
           setLoading(false);
         }
       }
@@ -49,6 +59,7 @@ export default function Home() {
     fetchData();
 
     return () => {
+      console.log('Component unmounting, cleaning up...');
       mounted = false;
     };
   }, []);
