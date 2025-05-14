@@ -5,6 +5,7 @@ import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import { Pie } from 'react-chartjs-2';
 import { useAuth } from './context/AuthContext';
 import Link from 'next/link';
+import FootprintForm from './components/FootprintForm';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -36,23 +37,40 @@ export default function Home() {
         console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
         console.log('Supabase Anon Key exists:', !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
         
-        const { data, error } = await supabase
-          .from('avg_monthly_household_footprint')
+        // First, try to get user's personal footprint data
+        const { data: userData, error: userError } = await supabase
+          .from('user_footprints')
           .select('*')
-          .eq('country', 'United States')
+          .eq('user_id', user?.id)
           .single();
 
-        console.log('Raw Supabase response:', { data, error });
-
-        if (error) {
-          console.error('Supabase error:', error);
-          throw error;
+        if (userError && userError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+          console.error('Error fetching user data:', userError);
+          throw userError;
         }
-        
-        if (mounted) {
-          console.log('Data received, updating state...');
-          setFootprintData(data ? [data] : []);
-          setIsConnected(true);
+
+        // If no user data exists, get the average US data
+        if (!userData) {
+          const { data: avgData, error: avgError } = await supabase
+            .from('avg_monthly_household_footprint')
+            .select('*')
+            .eq('country', 'United States')
+            .single();
+
+          if (avgError) {
+            console.error('Error fetching average data:', avgError);
+            throw avgError;
+          }
+
+          if (mounted) {
+            setFootprintData(avgData ? [avgData] : []);
+            setIsConnected(true);
+          }
+        } else {
+          if (mounted) {
+            setFootprintData([userData]);
+            setIsConnected(true);
+          }
         }
       } catch (error) {
         console.error('Error in fetchData:', error);
@@ -68,13 +86,15 @@ export default function Home() {
       }
     }
 
-    fetchData();
+    if (user) {
+      fetchData();
+    }
 
     return () => {
       console.log('Component unmounting, cleaning up...');
       mounted = false;
     };
-  }, []);
+  }, [user]);
 
   const formatValue = (value: number | null) => {
     if (value === null || value === undefined) return 'N/A';
@@ -178,54 +198,61 @@ export default function Home() {
       ) : footprintData.length === 0 ? (
         <div className="text-lg">No data available</div>
       ) : (
-        <div className="w-full max-w-6xl flex flex-col md:flex-row gap-8">
-          <div className="w-full md:w-1/2">
-            <div className="bg-white p-4 rounded-lg shadow">
-              {chartData && <Pie data={chartData} options={chartOptions} />}
+        <div className="w-full max-w-6xl flex flex-col gap-8">
+          <div className="w-full flex flex-col md:flex-row gap-8">
+            <div className="w-full md:w-1/2">
+              <div className="bg-white p-4 rounded-lg shadow">
+                {chartData && <Pie data={chartData} options={chartOptions} />}
+              </div>
+            </div>
+            <div className="w-full md:w-1/2">
+              <table className="min-w-full bg-white border border-gray-300">
+                <thead>
+                  <tr className="bg-gray-100">
+                    <th className="px-6 py-3 border-b text-left">Category</th>
+                    <th className="px-6 py-3 border-b text-right">Value</th>
+                    <th className="px-6 py-3 border-b text-left">Unit</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="px-6 py-4 border-b">Transportation</td>
+                    <td className="px-6 py-4 border-b text-right">{formatValue(footprintData[0].transportation)}</td>
+                    <td className="px-6 py-4 border-b">kg CO₂e/month</td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 border-b">Home Electricity</td>
+                    <td className="px-6 py-4 border-b text-right">{formatValue(footprintData[0].home_electricity)}</td>
+                    <td className="px-6 py-4 border-b">kg CO₂e/month</td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 border-b">Home Natural Gas</td>
+                    <td className="px-6 py-4 border-b text-right">{formatValue(footprintData[0].home_natural_gas)}</td>
+                    <td className="px-6 py-4 border-b">kg CO₂e/month</td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 border-b">Food</td>
+                    <td className="px-6 py-4 border-b text-right">{formatValue(footprintData[0].food)}</td>
+                    <td className="px-6 py-4 border-b">kg CO₂e/month</td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 border-b">Water</td>
+                    <td className="px-6 py-4 border-b text-right">{formatValue(footprintData[0].water)}</td>
+                    <td className="px-6 py-4 border-b">kg CO₂e/month</td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 border-b">Stuff</td>
+                    <td className="px-6 py-4 border-b text-right">{formatValue(footprintData[0].stuff)}</td>
+                    <td className="px-6 py-4 border-b">kg CO₂e/month</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
-          <div className="w-full md:w-1/2">
-            <table className="min-w-full bg-white border border-gray-300">
-              <thead>
-                <tr className="bg-gray-100">
-                  <th className="px-6 py-3 border-b text-left">Category</th>
-                  <th className="px-6 py-3 border-b text-right">Value</th>
-                  <th className="px-6 py-3 border-b text-left">Unit</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="hover:bg-gray-50">
-                  <td className="px-6 py-4 border-b">Transportation</td>
-                  <td className="px-6 py-4 border-b text-right">{formatValue(footprintData[0].transportation)}</td>
-                  <td className="px-6 py-4 border-b">kg CO2e/month</td>
-                </tr>
-                <tr className="hover:bg-gray-50">
-                  <td className="px-6 py-4 border-b">Home Electricity</td>
-                  <td className="px-6 py-4 border-b text-right">{formatValue(footprintData[0].home_electricity)}</td>
-                  <td className="px-6 py-4 border-b">kg CO2e/month</td>
-                </tr>
-                <tr className="hover:bg-gray-50">
-                  <td className="px-6 py-4 border-b">Home Natural Gas</td>
-                  <td className="px-6 py-4 border-b text-right">{formatValue(footprintData[0].home_natural_gas)}</td>
-                  <td className="px-6 py-4 border-b">kg CO2e/month</td>
-                </tr>
-                <tr className="hover:bg-gray-50">
-                  <td className="px-6 py-4 border-b">Food</td>
-                  <td className="px-6 py-4 border-b text-right">{formatValue(footprintData[0].food)}</td>
-                  <td className="px-6 py-4 border-b">kg CO2e/month</td>
-                </tr>
-                <tr className="hover:bg-gray-50">
-                  <td className="px-6 py-4 border-b">Water</td>
-                  <td className="px-6 py-4 border-b text-right">{formatValue(footprintData[0].water)}</td>
-                  <td className="px-6 py-4 border-b">kg CO2e/month</td>
-                </tr>
-                <tr className="hover:bg-gray-50">
-                  <td className="px-6 py-4 border-b">Stuff</td>
-                  <td className="px-6 py-4 border-b text-right">{formatValue(footprintData[0].stuff)}</td>
-                  <td className="px-6 py-4 border-b">kg CO2e/month</td>
-                </tr>
-              </tbody>
-            </table>
+          
+          <div className="w-full bg-white p-6 rounded-lg shadow">
+            <h2 className="text-2xl font-bold mb-4">Update Your Footprint Data</h2>
+            <FootprintForm />
           </div>
         </div>
       )}
