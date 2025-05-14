@@ -9,25 +9,50 @@ export default function SignUp() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
   const router = useRouter();
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setMessage(null);
 
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
       });
 
       if (error) throw error;
 
-      router.push('/auth/login');
-      router.refresh();
+      setMessage('Please check your email for the confirmation link. If you don\'t see it, check your spam folder.');
     } catch (error) {
       setError(error instanceof Error ? error.message : 'An error occurred during sign up');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendConfirmation = async () => {
+    setLoading(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+      });
+
+      if (error) throw error;
+
+      setMessage('Confirmation email resent. Please check your inbox.');
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'An error occurred while resending confirmation email');
     } finally {
       setLoading(false);
     }
@@ -79,6 +104,19 @@ export default function SignUp() {
 
           {error && (
             <div className="text-red-500 text-sm text-center">{error}</div>
+          )}
+
+          {message && (
+            <div className="text-green-600 text-sm text-center">
+              {message}
+              <button
+                type="button"
+                onClick={handleResendConfirmation}
+                className="block w-full mt-2 text-indigo-600 hover:text-indigo-500"
+              >
+                Resend confirmation email
+              </button>
+            </div>
           )}
 
           <div>
