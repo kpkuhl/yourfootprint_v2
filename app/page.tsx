@@ -3,6 +3,8 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../utils/supabase';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import { Pie } from 'react-chartjs-2';
+import { useAuth } from './context/AuthContext';
+import Link from 'next/link';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -18,6 +20,7 @@ type FootprintData = {
 };
 
 export default function Home() {
+  const { user, signOut } = useAuth();
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
   const [footprintData, setFootprintData] = useState<FootprintData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -130,9 +133,32 @@ export default function Home() {
     },
   };
 
+  if (!user) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-24">
+        <h1 className="text-4xl font-bold mb-8">Welcome to Your Footprint</h1>
+        <p className="text-lg mb-8">Please sign in to view your carbon footprint data.</p>
+        <Link
+          href="/auth/login"
+          className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+        >
+          Sign In
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <main className="flex min-h-screen flex-col items-center p-24">
-      <h1 className="text-4xl font-bold mb-8">US Household Carbon Footprint</h1>
+      <div className="w-full max-w-6xl flex justify-between items-center mb-8">
+        <h1 className="text-4xl font-bold">US Household Carbon Footprint</h1>
+        <button
+          onClick={() => signOut()}
+          className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+        >
+          Sign Out
+        </button>
+      </div>
       
       <div className="text-lg mb-8">
         Supabase connection status:{' '}
