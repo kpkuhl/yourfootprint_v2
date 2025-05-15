@@ -17,17 +17,42 @@ export default function SignUp() {
     setError(null);
 
     try {
+      console.log('Attempting to sign up with:', { email });
+      
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            footprint_data: {
+              transportation: 0,
+              home_electricity: 0,
+              home_natural_gas: 0,
+              food: 0,
+              water: 0,
+              stuff: 0
+            }
+          }
+        }
       });
 
-      if (error) throw error;
+      console.log('Signup response:', { data, error });
 
-      // Redirect to home page after successful signup
-      router.push('/');
-      router.refresh();
+      if (error) {
+        console.error('Signup error:', error);
+        throw error;
+      }
+
+      if (data?.user) {
+        console.log('User created successfully:', data.user);
+        // Redirect to home page after successful signup
+        router.push('/');
+        router.refresh();
+      } else {
+        throw new Error('No user data returned from signup');
+      }
     } catch (error) {
+      console.error('Error in handleSignUp:', error);
       setError(error instanceof Error ? error.message : 'An error occurred during sign up');
     } finally {
       setLoading(false);
