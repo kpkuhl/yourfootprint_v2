@@ -33,25 +33,15 @@ export default function FootprintForm() {
     setSuccess(false);
 
     try {
-      console.log('Submitting form data:', { user_id: user?.id, ...formData });
-      
-      const { data, error } = await supabase
-        .from('user_footprints')
-        .upsert({
-          user_id: user?.id,
-          ...formData,
-        })
-        .select();
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          footprint_data: formData
+        }
+      });
 
-      console.log('Supabase response:', { data, error });
-
-      if (error) {
-        console.error('Supabase error:', error);
-        throw error;
-      }
+      if (error) throw error;
 
       setSuccess(true);
-      console.log('Data saved successfully:', data);
     } catch (error) {
       console.error('Error in handleSubmit:', error);
       setError(error instanceof Error ? error.message : 'An error occurred while saving data');

@@ -1,6 +1,5 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../utils/supabase';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import { Pie } from 'react-chartjs-2';
 import { useAuth } from './context/AuthContext';
@@ -10,8 +9,6 @@ import FootprintForm from './components/FootprintForm';
 ChartJS.register(ArcElement, Tooltip, Legend);
 
 type FootprintData = {
-  id: number;
-  country: string;
   transportation: number;
   home_electricity: number;
   home_natural_gas: number;
@@ -22,78 +19,18 @@ type FootprintData = {
 
 export default function Home() {
   const { user, signOut } = useAuth();
-  const [isConnected, setIsConnected] = useState<boolean | null>(null);
-  const [footprintData, setFootprintData] = useState<FootprintData[]>([]);
+  const [footprintData, setFootprintData] = useState<FootprintData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    console.log('Component mounted, starting data fetch...');
-    let mounted = true;
-
-    async function fetchData() {
-      try {
-        console.log('Attempting to fetch data from Supabase...');
-        console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
-        console.log('Supabase Anon Key exists:', !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
-        
-        // First, try to get user's personal footprint data
-        const { data: userData, error: userError } = await supabase
-          .from('user_footprints')
-          .select('*')
-          .eq('user_id', user?.id)
-          .single();
-
-        if (userError && userError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
-          console.error('Error fetching user data:', userError);
-          throw userError;
-        }
-
-        // If no user data exists, get the average US data
-        if (!userData) {
-          const { data: avgData, error: avgError } = await supabase
-            .from('avg_monthly_household_footprint')
-            .select('*')
-            .eq('country', 'United States')
-            .single();
-
-          if (avgError) {
-            console.error('Error fetching average data:', avgError);
-            throw avgError;
-          }
-
-          if (mounted) {
-            setFootprintData(avgData ? [avgData] : []);
-            setIsConnected(true);
-          }
-        } else {
-          if (mounted) {
-            setFootprintData([userData]);
-            setIsConnected(true);
-          }
-        }
-      } catch (error) {
-        console.error('Error in fetchData:', error);
-        if (mounted) {
-          setIsConnected(false);
-          setError(error instanceof Error ? error.message : 'An error occurred while fetching data');
-        }
-      } finally {
-        if (mounted) {
-          console.log('Fetch complete, setting loading to false');
-          setLoading(false);
-        }
-      }
-    }
-
     if (user) {
-      fetchData();
+      const userData = user.user_metadata?.footprint_data;
+      if (userData) {
+        setFootprintData(userData);
+      }
+      setLoading(false);
     }
-
-    return () => {
-      console.log('Component unmounting, cleaning up...');
-      mounted = false;
-    };
   }, [user]);
 
   const formatValue = (value: number | null) => {
@@ -101,7 +38,7 @@ export default function Home() {
     return value.toLocaleString();
   };
 
-  const chartData = footprintData.length > 0 ? {
+  const chartData = footprintData ? {
     labels: [
       'Transportation',
       'Home Electricity',
@@ -113,12 +50,12 @@ export default function Home() {
     datasets: [
       {
         data: [
-          footprintData[0].transportation,
-          footprintData[0].home_electricity,
-          footprintData[0].home_natural_gas,
-          footprintData[0].food,
-          footprintData[0].water,
-          footprintData[0].stuff
+          footprintData.transportation,
+          footprintData.home_electricity,
+          footprintData.home_natural_gas,
+          footprintData.food,
+          footprintData.water,
+          footprintData.stuff
         ],
         backgroundColor: [
           '#FF6384',
@@ -148,7 +85,7 @@ export default function Home() {
       },
       title: {
         display: true,
-        text: 'US Household Carbon Footprint by Sector',
+        text: 'Your Carbon Footprint by Sector',
       },
     },
   };
@@ -171,7 +108,7 @@ export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center p-24">
       <div className="w-full max-w-6xl flex justify-between items-center mb-8">
-        <h1 className="text-4xl font-bold">US Household Carbon Footprint</h1>
+        <h1 className="text-4xl font-bold">Your Carbon Footprint</h1>
         <button
           onClick={() => signOut()}
           className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
@@ -179,77 +116,21 @@ export default function Home() {
           Sign Out
         </button>
       </div>
-      
-      <div className="text-lg mb-8">
-        Supabase connection status:{' '}
-        {isConnected === null ? (
-          <span className="text-gray-500">Checking...</span>
-        ) : isConnected ? (
-          <span className="text-green-500">Connected</span>
-        ) : (
-          <span className="text-red-500">Failed to connect</span>
-        )}
-      </div>
 
       {loading ? (
-        <div className="text-lg">Loading data...</div>
+        <div className="text-lg">Loading...</div>
       ) : error ? (
-        <div className="text-red-500">Error: {error}</div>
-      ) : footprintData.length === 0 ? (
-        <div className="text-lg">No data available</div>
+        <div className="text-red-500 text-lg">{error}</div>
       ) : (
-        <div className="w-full max-w-6xl flex flex-col gap-8">
-          <div className="w-full flex flex-col md:flex-row gap-8">
-            <div className="w-full md:w-1/2">
-              <div className="bg-white p-4 rounded-lg shadow">
-                {chartData && <Pie data={chartData} options={chartOptions} />}
+        <div className="w-full max-w-6xl space-y-8">
+          {chartData && (
+            <div className="w-full bg-white p-6 rounded-lg shadow">
+              <div className="h-96">
+                <Pie data={chartData} options={chartOptions} />
               </div>
             </div>
-            <div className="w-full md:w-1/2">
-              <table className="min-w-full bg-white border border-gray-300">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="px-6 py-3 border-b text-left">Category</th>
-                    <th className="px-6 py-3 border-b text-right">Value</th>
-                    <th className="px-6 py-3 border-b text-left">Unit</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td className="px-6 py-4 border-b">Transportation</td>
-                    <td className="px-6 py-4 border-b text-right">{formatValue(footprintData[0].transportation)}</td>
-                    <td className="px-6 py-4 border-b">kg CO₂e/month</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 border-b">Home Electricity</td>
-                    <td className="px-6 py-4 border-b text-right">{formatValue(footprintData[0].home_electricity)}</td>
-                    <td className="px-6 py-4 border-b">kg CO₂e/month</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 border-b">Home Natural Gas</td>
-                    <td className="px-6 py-4 border-b text-right">{formatValue(footprintData[0].home_natural_gas)}</td>
-                    <td className="px-6 py-4 border-b">kg CO₂e/month</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 border-b">Food</td>
-                    <td className="px-6 py-4 border-b text-right">{formatValue(footprintData[0].food)}</td>
-                    <td className="px-6 py-4 border-b">kg CO₂e/month</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 border-b">Water</td>
-                    <td className="px-6 py-4 border-b text-right">{formatValue(footprintData[0].water)}</td>
-                    <td className="px-6 py-4 border-b">kg CO₂e/month</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 border-b">Stuff</td>
-                    <td className="px-6 py-4 border-b text-right">{formatValue(footprintData[0].stuff)}</td>
-                    <td className="px-6 py-4 border-b">kg CO₂e/month</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-          
+          )}
+
           <div className="w-full bg-white p-6 rounded-lg shadow">
             <h2 className="text-2xl font-bold mb-4">Update Your Footprint Data</h2>
             <FootprintForm />
