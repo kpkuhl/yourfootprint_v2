@@ -28,27 +28,39 @@ export default function Home() {
   useEffect(() => {
     const fetchHouseholdData = async () => {
       try {
-        const { data, error } = await supabase
+        console.log('Attempting to fetch household data...');
+        
+        // First, let's see what data exists in the table
+        const { data: allData, error: listError } = await supabase
           .from('households')
-          .select('*')
-          .eq('id', 'feb53b61-63b0-461a-944b-d3d7028996d2')
-          .single();
+          .select('*');
+        
+        console.log('All households data:', allData);
+        
+        if (listError) {
+          console.error('Error listing households:', listError);
+          throw listError;
+        }
 
-        if (error) throw error;
-
-        if (data) {
+        // If we have data, use the first row
+        if (allData && allData.length > 0) {
+          const householdData = allData[0];
+          console.log('Using household data:', householdData);
           setFootprintData({
-            electricity: data.electricity || 0,
-            natural_gas: data.natural_gas || 0,
-            water: data.water || 0,
-            gasoline: data.gasoline || 0,
-            air_travel: data.air_travel || 0,
-            food: data.food || 0,
-            stuff: data.stuff || 0
+            electricity: householdData.electricity || 0,
+            natural_gas: householdData.natural_gas || 0,
+            water: householdData.water || 0,
+            gasoline: householdData.gasoline || 0,
+            air_travel: householdData.air_travel || 0,
+            food: householdData.food || 0,
+            stuff: householdData.stuff || 0
           });
+        } else {
+          console.log('No households found in the table');
+          throw new Error('No household data found in the database');
         }
       } catch (error) {
-        console.error('Error fetching household data:', error);
+        console.error('Error in fetchHouseholdData:', error);
         setError(error instanceof Error ? error.message : 'An error occurred while fetching data');
       } finally {
         setLoading(false);
