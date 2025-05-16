@@ -44,7 +44,10 @@ export default function Home() {
         }
 
         if (data) {
-          console.log('Found household data:', data);
+          console.log('Found household data:', {
+            ...data,
+            sq_ft: data.sq_ft || 'Not specified'
+          });
           setFootprintData({
             electricity: data.electricity || 0,
             natural_gas: data.natural_gas || 0,
