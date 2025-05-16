@@ -28,36 +28,35 @@ export default function Home() {
   useEffect(() => {
     const fetchHouseholdData = async () => {
       try {
-        console.log('Attempting to fetch household data...');
+        console.log('Attempting to fetch household data for ID: feb53b61-63b0-461a-944b-d3d7028996d2');
         
-        // First, let's see what data exists in the table
-        const { data: allData, error: listError } = await supabase
+        const { data, error } = await supabase
           .from('households')
-          .select('*');
+          .select('*')
+          .eq('id', 'feb53b61-63b0-461a-944b-d3d7028996d2')
+          .single();
         
-        console.log('All households data:', allData);
+        console.log('Supabase response:', { data, error });
         
-        if (listError) {
-          console.error('Error listing households:', listError);
-          throw listError;
+        if (error) {
+          console.error('Error fetching household:', error);
+          throw error;
         }
 
-        // If we have data, use the first row
-        if (allData && allData.length > 0) {
-          const householdData = allData[0];
-          console.log('Using household data:', householdData);
+        if (data) {
+          console.log('Found household data:', data);
           setFootprintData({
-            electricity: householdData.electricity || 0,
-            natural_gas: householdData.natural_gas || 0,
-            water: householdData.water || 0,
-            gasoline: householdData.gasoline || 0,
-            air_travel: householdData.air_travel || 0,
-            food: householdData.food || 0,
-            stuff: householdData.stuff || 0
+            electricity: data.electricity || 0,
+            natural_gas: data.natural_gas || 0,
+            water: data.water || 0,
+            gasoline: data.gasoline || 0,
+            air_travel: data.air_travel || 0,
+            food: data.food || 0,
+            stuff: data.stuff || 0
           });
         } else {
-          console.log('No households found in the table');
-          throw new Error('No household data found in the database');
+          console.error('No data found for ID: feb53b61-63b0-461a-944b-d3d7028996d2');
+          throw new Error('No data found for the specified household ID');
         }
       } catch (error) {
         console.error('Error in fetchHouseholdData:', error);
