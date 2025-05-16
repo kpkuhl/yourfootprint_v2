@@ -5,15 +5,17 @@ import { Pie } from 'react-chartjs-2';
 import { useAuth } from './context/AuthContext';
 import Link from 'next/link';
 import FootprintForm from './components/FootprintForm';
+import { supabase } from '../utils/supabase';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
 type FootprintData = {
-  transportation: number;
-  home_electricity: number;
-  home_natural_gas: number;
-  food: number;
+  electricity: number;
+  natural_gas: number;
   water: number;
+  gasoline: number;
+  air_travel: number;
+  food: number;
   stuff: number;
 };
 
@@ -24,11 +26,38 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user) {
-      const userData = user.user_metadata?.footprint_data;
-      if (userData) {
-        setFootprintData(userData);
+    const fetchHouseholdData = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('households')
+          .select('*')
+          .eq('id', 'feb53b61-63b0-461a-944b-d3d7028996d2')
+          .single();
+
+        if (error) throw error;
+
+        if (data) {
+          setFootprintData({
+            electricity: data.electricity || 0,
+            natural_gas: data.natural_gas || 0,
+            water: data.water || 0,
+            gasoline: data.gasoline || 0,
+            air_travel: data.air_travel || 0,
+            food: data.food || 0,
+            stuff: data.stuff || 0
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching household data:', error);
+        setError(error instanceof Error ? error.message : 'An error occurred while fetching data');
+      } finally {
+        setLoading(false);
       }
+    };
+
+    if (user) {
+      fetchHouseholdData();
+    } else {
       setLoading(false);
     }
   }, [user]);
@@ -40,21 +69,23 @@ export default function Home() {
 
   const chartData = footprintData ? {
     labels: [
-      'Transportation',
-      'Home Electricity',
-      'Home Natural Gas',
-      'Food',
+      'Electricity',
+      'Natural Gas',
       'Water',
+      'Gasoline',
+      'Air Travel',
+      'Food',
       'Stuff'
     ],
     datasets: [
       {
         data: [
-          footprintData.transportation,
-          footprintData.home_electricity,
-          footprintData.home_natural_gas,
-          footprintData.food,
+          footprintData.electricity,
+          footprintData.natural_gas,
           footprintData.water,
+          footprintData.gasoline,
+          footprintData.air_travel,
+          footprintData.food,
           footprintData.stuff
         ],
         backgroundColor: [
@@ -63,7 +94,8 @@ export default function Home() {
           '#FFCE56',
           '#4BC0C0',
           '#9966FF',
-          '#FF9F40'
+          '#FF9F40',
+          '#FF6384'
         ],
         borderColor: [
           '#FF6384',
@@ -71,7 +103,8 @@ export default function Home() {
           '#FFCE56',
           '#4BC0C0',
           '#9966FF',
-          '#FF9F40'
+          '#FF9F40',
+          '#FF6384'
         ],
         borderWidth: 1,
       },
@@ -85,7 +118,7 @@ export default function Home() {
       },
       title: {
         display: true,
-        text: 'Your Carbon Footprint by Sector',
+        text: 'Average Monthly US Household Carbon Footprint by Category',
       },
     },
   };
