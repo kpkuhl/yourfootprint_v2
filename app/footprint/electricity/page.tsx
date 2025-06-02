@@ -27,6 +27,7 @@ export default function ElectricityPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [isNewEntry, setIsNewEntry] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -49,6 +50,7 @@ export default function ElectricityPage() {
             start_date: new Date(data.start_date).toISOString().split('T')[0],
             end_date: new Date(data.end_date).toISOString().split('T')[0]
           });
+          setIsNewEntry(false);
         } else {
           // Set default values for new entries
           const today = new Date();
@@ -60,6 +62,7 @@ export default function ElectricityPage() {
             end_date: today.toISOString().split('T')[0],
             units: 'kWh'
           }));
+          setIsNewEntry(true);
         }
       } catch (error) {
         console.error('Error fetching electricity data:', error);
@@ -79,15 +82,28 @@ export default function ElectricityPage() {
     try {
       const { error } = await supabase
         .from('electricity')
-        .upsert({
+        .insert({
           ...electricityData,
           user_id: user.id,
-          id: electricityData.id || crypto.randomUUID()
+          id: crypto.randomUUID() // Always create a new row
         });
 
       if (error) throw error;
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
+      
+      // Reset form for new entry
+      const today = new Date();
+      const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      setElectricityData(prev => ({
+        ...prev,
+        id: undefined,
+        start_date: lastMonth.toISOString().split('T')[0],
+        end_date: today.toISOString().split('T')[0],
+        amount: 0,
+        CI_kg_kWh: null
+      }));
+      setIsNewEntry(true);
     } catch (error) {
       console.error('Error updating electricity data:', error);
       setError('Failed to update electricity data');
@@ -223,14 +239,16 @@ export default function ElectricityPage() {
               )}
 
               {success && (
-                <div className="text-green-500 text-sm">Electricity data updated successfully!</div>
+                <div className="text-green-500 text-sm">
+                  {isNewEntry ? 'New electricity entry added successfully!' : 'Electricity data updated successfully!'}
+                </div>
               )}
 
               <button
                 type="submit"
                 className="w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
               >
-                Update Electricity Data
+                {isNewEntry ? 'Add New Electricity Entry' : 'Update Electricity Data'}
               </button>
             </form>
           </div>
