@@ -619,15 +619,15 @@ export default function NaturalGasPage() {
                     Carbon Intensity (kg CO2e/therm)
                   </label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="decimal"
                     id="CI_kg_therm"
                     name="CI_kg_therm"
                     value={inputCI}
                     onChange={handleChange}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                     placeholder="Enter value or leave blank for default"
-                    min="0"
-                    step="0.01"
+                    pattern="[0-9]*[.]?[0-9]*"
                   />
                   <p className="mt-1 text-sm text-gray-500">
                     Default value: 5.291 kg CO2e/therm
