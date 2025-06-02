@@ -162,7 +162,10 @@ export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center p-24">
       <div className="w-full max-w-6xl flex justify-between items-center mb-8">
-        <h1 className="text-4xl font-bold">Your Carbon Footprint</h1>
+        <div>
+          <h1 className="text-4xl font-bold">Your Carbon Footprint</h1>
+          <p className="text-lg text-gray-600 mt-2">Monthly kg CO2e</p>
+        </div>
         <button
           onClick={() => signOut()}
           className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
