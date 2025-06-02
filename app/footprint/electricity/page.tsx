@@ -9,9 +9,16 @@ type ElectricityData = {
   user_id: string;
   start_date: string;
   end_date: string;
-  amount: number;
-  units: string;
+  amount_kWh: number;
   CI_kg_kWh: number | null;
+  CO2e: number | null;
+};
+
+type ConversionFactor = {
+  start_unit: string;
+  end_unit: string;
+  factor: number;
+  data_type: string;
 };
 
 const STORAGE_KEY = 'electricity_form_data';
@@ -22,10 +29,13 @@ export default function ElectricityPage() {
     user_id: '',
     start_date: '',
     end_date: '',
-    amount: 0,
-    units: 'kWh',
-    CI_kg_kWh: null
+    amount_kWh: 0,
+    CI_kg_kWh: null,
+    CO2e: null
   });
+  const [inputAmount, setInputAmount] = useState<number>(0);
+  const [inputUnit, setInputUnit] = useState<string>('kWh');
+  const [conversionFactors, setConversionFactors] = useState<ConversionFactor[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -42,11 +52,32 @@ export default function ElectricityPage() {
           const parsedData = JSON.parse(savedData);
           console.log('Parsed data:', parsedData);
           setElectricityData(parsedData);
+          setInputAmount(parsedData.amount_kWh);
+          setInputUnit('kWh');
         } catch (e) {
           console.error('Error parsing saved form data:', e);
         }
       }
     }
+  }, []);
+
+  // Fetch conversion factors
+  useEffect(() => {
+    const fetchConversionFactors = async () => {
+      const { data, error } = await supabase
+        .from('conversion_factors')
+        .select('*')
+        .eq('data_type', 'electricity');
+
+      if (error) {
+        console.error('Error fetching conversion factors:', error);
+        return;
+      }
+
+      setConversionFactors(data || []);
+    };
+
+    fetchConversionFactors();
   }, []);
 
   // Save form data to localStorage whenever it changes
@@ -86,11 +117,9 @@ export default function ElectricityPage() {
       console.log('Retrieved data from Supabase:', data);
       
       if (data) {
-        setElectricityData({
-          ...data,
-          start_date: new Date(data.start_date).toISOString().split('T')[0],
-          end_date: new Date(data.end_date).toISOString().split('T')[0]
-        });
+        setElectricityData(data);
+        setInputAmount(data.amount_kWh);
+        setInputUnit('kWh');
       } else {
         // Set default values for new entries
         const today = new Date();
@@ -99,15 +128,35 @@ export default function ElectricityPage() {
           user_id: user.id,
           start_date: lastMonth.toISOString().split('T')[0],
           end_date: today.toISOString().split('T')[0],
-          amount: 0,
-          units: 'kWh',
-          CI_kg_kWh: 0.0004
+          amount_kWh: 0,
+          CI_kg_kWh: null,
+          CO2e: null
         });
       }
     };
 
     fetchData();
   }, [user]);
+
+  const convertToKWh = (amount: number, fromUnit: string): number => {
+    if (fromUnit === 'kWh') return amount;
+    
+    const conversion = conversionFactors.find(
+      cf => cf.start_unit === fromUnit && cf.end_unit === 'kWh'
+    );
+    
+    if (!conversion) {
+      console.error(`No conversion factor found for ${fromUnit} to kWh`);
+      return amount;
+    }
+    
+    return amount * conversion.factor;
+  };
+
+  const calculateCO2e = (amount_kWh: number, CI_kg_kWh: number | null): number | null => {
+    if (!CI_kg_kWh) return null;
+    return amount_kWh * CI_kg_kWh;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,15 +166,18 @@ export default function ElectricityPage() {
     setError(null);
 
     try {
+      const amount_kWh = convertToKWh(inputAmount, inputUnit);
+      const CO2e = calculateCO2e(amount_kWh, electricityData.CI_kg_kWh);
+
       const { error } = await supabase
         .from('electricity')
         .insert([{
           user_id: user.id,
           start_date: electricityData.start_date,
           end_date: electricityData.end_date,
-          amount: electricityData.amount,
-          units: electricityData.units,
-          CI_kg_kWh: electricityData.CI_kg_kWh
+          amount_kWh,
+          CI_kg_kWh: electricityData.CI_kg_kWh,
+          CO2e
         }]);
 
       if (error) throw error;
@@ -140,10 +192,12 @@ export default function ElectricityPage() {
         user_id: user.id,
         start_date: lastMonth.toISOString().split('T')[0],
         end_date: today.toISOString().split('T')[0],
-        amount: 0,
-        units: 'kWh',
-        CI_kg_kWh: null
+        amount_kWh: 0,
+        CI_kg_kWh: null,
+        CO2e: null
       });
+      setInputAmount(0);
+      setInputUnit('kWh');
       setIsNewEntry(true);
     } catch (error) {
       console.error('Error saving electricity data:', error);
@@ -156,10 +210,17 @@ export default function ElectricityPage() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     console.log('Form field changed:', name, value);
-    setElectricityData(prev => ({
-      ...prev,
-      [name]: name === 'amount' || name === 'CI_kg_kWh' ? Number(value) : value
-    }));
+    
+    if (name === 'amount') {
+      setInputAmount(Number(value));
+    } else if (name === 'unit') {
+      setInputUnit(value);
+    } else {
+      setElectricityData(prev => ({
+        ...prev,
+        [name]: name === 'CI_kg_kWh' ? Number(value) : value
+      }));
+    }
   };
 
   if (!user) {
@@ -232,7 +293,7 @@ export default function ElectricityPage() {
                     type="number"
                     id="amount"
                     name="amount"
-                    value={electricityData.amount}
+                    value={inputAmount}
                     onChange={handleChange}
                     min="0"
                     step="0.01"
@@ -242,13 +303,13 @@ export default function ElectricityPage() {
                 </div>
 
                 <div>
-                  <label htmlFor="units" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="unit" className="block text-sm font-medium text-gray-700">
                     Units
                   </label>
                   <select
-                    id="units"
-                    name="units"
-                    value={electricityData.units}
+                    id="unit"
+                    name="unit"
+                    value={inputUnit}
                     onChange={handleChange}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                     required
