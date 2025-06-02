@@ -43,6 +43,7 @@ type ConversionFactor = {
 };
 
 type MonthlyData = {
+  id: string;
   month: string;
   CO2e: number;
 };
@@ -91,6 +92,9 @@ export default function ElectricityPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [isNewEntry, setIsNewEntry] = useState(true);
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
+  const [rawData, setRawData] = useState<ElectricityData[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<ElectricityData | null>(null);
 
   // Load saved form data from localStorage
   useEffect(() => {
@@ -189,7 +193,7 @@ export default function ElectricityPage() {
     fetchData();
   }, [user]);
 
-  // Add new useEffect to fetch and process data for plotting
+  // Update fetchMonthlyData to include id in monthly data
   useEffect(() => {
     const fetchMonthlyData = async () => {
       if (!user) return;
@@ -205,8 +209,11 @@ export default function ElectricityPage() {
         return;
       }
 
+      setRawData(data || []);
+
       // Process data to get monthly values
       const monthlyValues = data.map(entry => ({
+        id: entry.id,
         month: getMajorityMonth(entry.start_date, entry.end_date),
         CO2e: entry.CO2e
       }));
@@ -347,6 +354,84 @@ export default function ElectricityPage() {
     }
   };
 
+  const handleDelete = async (id: string) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('electricity')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      // Refresh data after deletion
+      setRawData(prev => prev.filter(entry => entry.id !== id));
+      setMonthlyData(prev => prev.filter(entry => entry.id !== id));
+    } catch (error) {
+      console.error('Error deleting entry:', error);
+      setError('Failed to delete entry');
+    }
+  };
+
+  const handleEdit = (entry: ElectricityData) => {
+    setEditingId(entry.id);
+    setEditForm(entry);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !editingId || !editForm) return;
+
+    try {
+      const { error } = await supabase
+        .from('electricity')
+        .update({
+          start_date: editForm.start_date,
+          end_date: editForm.end_date,
+          amount_kWh: editForm.amount_kWh,
+          CI_kg_kWh: editForm.CI_kg_kWh,
+          CO2e: editForm.CO2e
+        })
+        .eq('id', editingId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      // Refresh data after update
+      setRawData(prev => prev.map(entry => 
+        entry.id === editingId ? editForm : entry
+      ));
+      setMonthlyData(prev => prev.map(entry => 
+        entry.id === editingId ? {
+          id: entry.id,
+          month: getMajorityMonth(editForm.start_date, editForm.end_date),
+          CO2e: editForm.CO2e
+        } : entry
+      ));
+
+      setEditingId(null);
+      setEditForm(null);
+      setSuccess('Entry updated successfully!');
+    } catch (error) {
+      console.error('Error updating entry:', error);
+      setError('Failed to update entry');
+    }
+  };
+
+  const handleEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    if (!editForm) return;
+
+    setEditForm(prev => ({
+      ...prev!,
+      [name]: name === 'amount_kWh' || name === 'CI_kg_kWh' || name === 'CO2e' 
+        ? Number(value) 
+        : value
+    }));
+  };
+
   if (!user) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-24">
@@ -482,8 +567,121 @@ export default function ElectricityPage() {
             </div>
 
             {monthlyData.length > 0 && (
-              <div className="bg-white p-6 rounded-lg shadow">
+              <div className="bg-white p-6 rounded-lg shadow mb-8">
                 <Line data={chartData} options={chartOptions} />
+              </div>
+            )}
+
+            {rawData.length > 0 && (
+              <div className="bg-white p-6 rounded-lg shadow">
+                <h2 className="text-xl font-bold mb-4">Your Electricity Data</h2>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Range</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount (kWh)</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Carbon Intensity</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CO2e (kg)</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {rawData.map((entry) => (
+                        <tr key={entry.id}>
+                          {editingId === entry.id ? (
+                            <>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <input
+                                  type="date"
+                                  name="start_date"
+                                  value={editForm?.start_date}
+                                  onChange={handleEditChange}
+                                  className="border rounded px-2 py-1"
+                                />
+                                <span className="mx-2">to</span>
+                                <input
+                                  type="date"
+                                  name="end_date"
+                                  value={editForm?.end_date}
+                                  onChange={handleEditChange}
+                                  className="border rounded px-2 py-1"
+                                />
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <input
+                                  type="text"
+                                  name="amount_kWh"
+                                  value={editForm?.amount_kWh}
+                                  onChange={handleEditChange}
+                                  className="border rounded px-2 py-1 w-24"
+                                />
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <input
+                                  type="text"
+                                  name="CI_kg_kWh"
+                                  value={editForm?.CI_kg_kWh || ''}
+                                  onChange={handleEditChange}
+                                  className="border rounded px-2 py-1 w-24"
+                                />
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <input
+                                  type="text"
+                                  name="CO2e"
+                                  value={editForm?.CO2e}
+                                  onChange={handleEditChange}
+                                  className="border rounded px-2 py-1 w-24"
+                                />
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <button
+                                  onClick={handleEditSubmit}
+                                  className="text-green-600 hover:text-green-900 mr-2"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setEditingId(null);
+                                    setEditForm(null);
+                                  }}
+                                  className="text-gray-600 hover:text-gray-900"
+                                >
+                                  Cancel
+                                </button>
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                {new Date(entry.start_date).toLocaleDateString()} to {new Date(entry.end_date).toLocaleDateString()}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">{entry.amount_kWh}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">{entry.CI_kg_kWh || 'N/A'}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">{entry.CO2e}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <button
+                                  onClick={() => handleEdit(entry)}
+                                  className="text-indigo-600 hover:text-indigo-900 mr-2"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(entry.id!)}
+                                  className="text-red-600 hover:text-red-900"
+                                >
+                                  Delete
+                                </button>
+                              </td>
+                            </>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </>
