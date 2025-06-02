@@ -95,6 +95,7 @@ export default function ElectricityPage() {
   const [rawData, setRawData] = useState<ElectricityData[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<ElectricityData | null>(null);
+  const [inputEditCI, setInputEditCI] = useState<string>('');
 
   // Load saved form data from localStorage
   useEffect(() => {
@@ -378,32 +379,49 @@ export default function ElectricityPage() {
   const handleEdit = (entry: ElectricityData) => {
     setEditingId(entry.id);
     setEditForm(entry);
+    setInputEditCI(entry.CI_kg_kWh?.toString() || '');
   };
 
   const handleEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     if (!editForm) return;
 
-    const newValue = name === 'amount_kWh' || name === 'CI_kg_kWh' || name === 'CO2e' 
-      ? Number(value) 
-      : value;
-
-    setEditForm(prev => {
-      const updated = {
-        ...prev!,
-        [name]: newValue
-      };
-
-      // Recalculate CO2e if amount or carbon intensity changes
-      if (name === 'amount_kWh' || name === 'CI_kg_kWh') {
-        updated.CO2e = calculateCO2e(
-          name === 'amount_kWh' ? newValue as number : updated.amount_kWh,
-          name === 'CI_kg_kWh' ? newValue as number : updated.CI_kg_kWh
-        );
+    if (name === 'CI_kg_kWh') {
+      setInputEditCI(value);
+      // Only update the form's CI_kg_kWh if it's a valid number
+      if (value === '' || !isNaN(Number(value))) {
+        setEditForm(prev => {
+          const updated = {
+            ...prev!,
+            [name]: value === '' ? 0 : Number(value)
+          };
+          // Recalculate CO2e
+          updated.CO2e = calculateCO2e(updated.amount_kWh, updated.CI_kg_kWh);
+          return updated;
+        });
       }
+    } else {
+      const newValue = name === 'amount_kWh' || name === 'CO2e' 
+        ? Number(value) 
+        : value;
 
-      return updated;
-    });
+      setEditForm(prev => {
+        const updated = {
+          ...prev!,
+          [name]: newValue
+        };
+
+        // Recalculate CO2e if amount changes
+        if (name === 'amount_kWh') {
+          updated.CO2e = calculateCO2e(
+            newValue as number,
+            updated.CI_kg_kWh
+          );
+        }
+
+        return updated;
+      });
+    }
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
@@ -411,10 +429,18 @@ export default function ElectricityPage() {
     if (!user || !editingId || !editForm) return;
 
     try {
+      // Convert CI_kg_kWh to number one final time
+      const finalCI = Number(inputEditCI);
+      if (isNaN(finalCI)) {
+        setError('Invalid carbon intensity value');
+        return;
+      }
+
       // Recalculate CO2e one final time before saving
       const finalForm = {
         ...editForm,
-        CO2e: calculateCO2e(editForm.amount_kWh, editForm.CI_kg_kWh)
+        CI_kg_kWh: finalCI,
+        CO2e: calculateCO2e(editForm.amount_kWh, finalCI)
       };
 
       const { error } = await supabase
@@ -448,6 +474,7 @@ export default function ElectricityPage() {
 
       setEditingId(null);
       setEditForm(null);
+      setInputEditCI('');
       setSuccess('Entry updated successfully!');
     } catch (error) {
       console.error('Error updating entry:', error);
@@ -644,9 +671,10 @@ export default function ElectricityPage() {
                                 <input
                                   type="text"
                                   name="CI_kg_kWh"
-                                  value={editForm?.CI_kg_kWh || ''}
+                                  value={inputEditCI}
                                   onChange={handleEditChange}
-                                  className="border rounded px-2 py-1 w-24"
+                                  className="w-full p-2 border rounded"
+                                  required
                                 />
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
