@@ -291,14 +291,13 @@ export default function ElectricityPage() {
                     Amount
                   </label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="decimal"
                     id="amount"
                     name="amount"
                     value={inputAmount}
                     onChange={handleChange}
-                    min="0"
-                    step="0.01"
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     required
                   />
                 </div>
@@ -326,14 +325,13 @@ export default function ElectricityPage() {
                   Carbon Intensity (kg CO2e/kWh)
                 </label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   id="CI_kg_kWh"
                   name="CI_kg_kWh"
                   value={electricityData.CI_kg_kWh || ''}
                   onChange={handleChange}
-                  min="0"
-                  step="0.01"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
                 <p className="mt-1 text-sm text-gray-500">
                   Optional: Enter the carbon intensity of your electricity. If left blank, we'll use the average for your region.
