@@ -26,9 +26,9 @@ export default function ElectricityPage() {
     units: 'kWh',
     CI_kg_kWh: null
   });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [success, setSuccess] = useState<string | null>(null);
   const [isNewEntry, setIsNewEntry] = useState(true);
 
   // Load saved form data from localStorage
@@ -64,46 +64,34 @@ export default function ElectricityPage() {
   useEffect(() => {
     const fetchData = async () => {
       if (!user) return;
+      
+      console.log('Fetching data from Supabase for user:', user.id);
+      const { data, error } = await supabase
+        .from('electricity')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
 
-      try {
-        console.log('Fetching data from Supabase for user:', user.id);
-        const { data, error } = await supabase
-          .from('electricity')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('end_date', { ascending: false })
-          .limit(1)
-          .single();
+      if (error) {
+        console.error('Error fetching data:', error);
+        return;
+      }
 
-        if (error && error.code !== 'PGRST116') throw error; // PGRST116 is "no rows returned" error
-        
-        if (data) {
-          console.log('Retrieved data from Supabase:', data);
-          setElectricityData({
-            ...data,
-            start_date: new Date(data.start_date).toISOString().split('T')[0],
-            end_date: new Date(data.end_date).toISOString().split('T')[0]
-          });
-          setIsNewEntry(false);
-        } else {
-          console.log('No data found in Supabase, setting defaults');
-          // Set default values for new entries
-          const today = new Date();
-          const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-          setElectricityData(prev => ({
-            ...prev,
-            user_id: user.id,
-            start_date: lastMonth.toISOString().split('T')[0],
-            end_date: today.toISOString().split('T')[0],
-            units: 'kWh'
-          }));
-          setIsNewEntry(true);
-        }
-      } catch (error) {
-        console.error('Error fetching electricity data:', error);
-        setError('Failed to load electricity data');
-      } finally {
-        setLoading(false);
+      console.log('Retrieved data from Supabase:', data);
+      
+      // Only update state if there's no data in localStorage
+      const savedData = localStorage.getItem(STORAGE_KEY);
+      if (!savedData) {
+        setElectricityData(data || {
+          user_id: user.id,
+          start_date: '',
+          end_date: '',
+          amount: 0,
+          units: 'kWh',
+          CI_kg_kWh: 0.0004
+        });
       }
     };
 
@@ -114,40 +102,40 @@ export default function ElectricityPage() {
     e.preventDefault();
     if (!user) return;
 
+    setLoading(true);
+    setError(null);
+
     try {
-      console.log('Submitting form data:', electricityData);
       const { error } = await supabase
         .from('electricity')
-        .insert({
+        .insert([{
           ...electricityData,
-          user_id: user.id,
-          id: crypto.randomUUID() // Always create a new row
-        });
+          start_date: new Date(electricityData.start_date).toISOString(),
+          end_date: new Date(electricityData.end_date).toISOString()
+        }]);
 
       if (error) throw error;
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
-      
-      // Reset form for new entry
+
+      setSuccess('Electricity data saved successfully!');
+      // Clear localStorage after successful submission
+      localStorage.removeItem(STORAGE_KEY);
+      // Reset form with default values
       const today = new Date();
       const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      const newData = {
-        ...electricityData,
-        id: undefined,
+      setElectricityData({
+        user_id: user.id,
         start_date: lastMonth.toISOString().split('T')[0],
         end_date: today.toISOString().split('T')[0],
         amount: 0,
-        CI_kg_kWh: null
-      };
-      console.log('Resetting form with new data:', newData);
-      setElectricityData(newData);
-      // Clear localStorage after successful submission
-      console.log('Clearing localStorage after submission');
-      localStorage.removeItem(STORAGE_KEY);
+        units: 'kWh',
+        CI_kg_kWh: 0.0004
+      });
       setIsNewEntry(true);
     } catch (error) {
-      console.error('Error updating electricity data:', error);
-      setError('Failed to update electricity data');
+      console.error('Error saving electricity data:', error);
+      setError('Failed to save electricity data');
+    } finally {
+      setLoading(false);
     }
   };
 
