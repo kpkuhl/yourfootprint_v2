@@ -171,9 +171,20 @@ export default function GasolinePage() {
     setSuccess(null);
 
     try {
-      const CO2e_kg = calculateCO2e(gasolineData.gallons, gasolineData.CI_kg_gal);
+      // Calculate gallons from dollars and price per gallon if gallons not provided
+      let gallons = gasolineData.gallons;
+      if (!gallons && gasolineData.dollars && gasolineData.dollar_gal) {
+        gallons = gasolineData.dollars / gasolineData.dollar_gal;
+      }
+
+      if (!gallons) {
+        throw new Error('Please provide either gallons or both dollars spent and price per gallon');
+      }
+
+      const CO2e_kg = calculateCO2e(gallons, gasolineData.CI_kg_gal);
       const dataToSubmit = {
         ...gasolineData,
+        gallons,
         CO2e_kg,
         user_id: user.id
       };
@@ -206,7 +217,7 @@ export default function GasolinePage() {
       });
     } catch (error) {
       console.error('Error saving gasoline data:', error);
-      setError('Failed to save gasoline data. Please try again.');
+      setError(error instanceof Error ? error.message : 'Failed to save gasoline data. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -222,12 +233,17 @@ export default function GasolinePage() {
           ...prev,
           [name]: numValue
         };
-        if (name === 'gallons' || name === 'CI_kg_gal') {
-          updated.CO2e_kg = calculateCO2e(
-            name === 'gallons' ? (numValue || 0) : prev.gallons,
-            name === 'CI_kg_gal' ? numValue : prev.CI_kg_gal
-          );
+
+        // Calculate gallons from dollars and price per gallon if both are provided and gallons is empty
+        if (!updated.gallons && updated.dollars && updated.dollar_gal) {
+          updated.gallons = updated.dollars / updated.dollar_gal;
         }
+
+        // Calculate CO2e if we have gallons (either directly or calculated)
+        if (updated.gallons) {
+          updated.CO2e_kg = calculateCO2e(updated.gallons, updated.CI_kg_gal);
+        }
+
         return updated;
       });
     } else {
@@ -419,7 +435,7 @@ export default function GasolinePage() {
 
                 <div>
                   <label htmlFor="gallons" className="block text-sm font-medium text-gray-700">
-                    Gallons
+                    Gallons (or leave empty and provide dollars spent and price per gallon)
                   </label>
                   <input
                     type="number"
@@ -429,13 +445,12 @@ export default function GasolinePage() {
                     value={gasolineData.gallons || ''}
                     onChange={handleChange}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                    required
                   />
                 </div>
 
                 <div>
                   <label htmlFor="dollars" className="block text-sm font-medium text-gray-700">
-                    Dollars Spent (Optional)
+                    Dollars Spent (Required if gallons not provided)
                   </label>
                   <input
                     type="number"
@@ -450,7 +465,7 @@ export default function GasolinePage() {
 
                 <div>
                   <label htmlFor="dollar_gal" className="block text-sm font-medium text-gray-700">
-                    Price per Gallon (Optional)
+                    Price per Gallon (Required if gallons not provided)
                   </label>
                   <input
                     type="number"
