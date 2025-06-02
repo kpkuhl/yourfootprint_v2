@@ -22,6 +22,7 @@ type FootprintData = {
 export default function Home() {
   const { user, signOut } = useAuth();
   const [footprintData, setFootprintData] = useState<FootprintData | null>(null);
+  const [userData, setUserData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,6 +54,9 @@ export default function Home() {
           console.error('Error fetching user household:', userError);
           throw userError;
         }
+
+        // Store user data for label comparison
+        setUserData(userData);
 
         // Merge user data with average data, using user data when available
         setFootprintData({
@@ -86,13 +90,13 @@ export default function Home() {
 
   const chartData = footprintData ? {
     labels: [
-      'Electricity',
-      'Natural Gas',
-      'Water',
-      'Gasoline',
-      'Air Travel',
-      'Food',
-      'Stuff'
+      userData?.electricity ? 'Electricity' : 'Electricity (avg US)',
+      userData?.natural_gas ? 'Natural Gas' : 'Natural Gas (avg US)',
+      userData?.water ? 'Water' : 'Water (avg US)',
+      userData?.gasoline ? 'Gasoline' : 'Gasoline (avg US)',
+      userData?.air_travel ? 'Air Travel' : 'Air Travel (avg US)',
+      userData?.food ? 'Food' : 'Food (avg US)',
+      userData?.stuff ? 'Stuff' : 'Stuff (avg US)'
     ],
     datasets: [
       {
