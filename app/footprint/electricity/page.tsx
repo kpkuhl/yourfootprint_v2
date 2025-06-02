@@ -117,15 +117,19 @@ export default function ElectricityPage() {
     setError(null);
 
     try {
-      // Create a new object without the id field
-      const { id, ...dataToInsert } = electricityData;
+      // Generate a new UUID for the entry
+      const newId = crypto.randomUUID();
       
       const { error } = await supabase
         .from('electricity')
         .insert([{
-          ...dataToInsert,
+          id: newId,
+          user_id: user.id,
           start_date: new Date(electricityData.start_date).toISOString(),
-          end_date: new Date(electricityData.end_date).toISOString()
+          end_date: new Date(electricityData.end_date).toISOString(),
+          amount: electricityData.amount,
+          units: electricityData.units,
+          CI_kg_kWh: electricityData.CI_kg_kWh
         }]);
 
       if (error) throw error;
