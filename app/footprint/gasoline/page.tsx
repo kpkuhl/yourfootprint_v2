@@ -186,6 +186,57 @@ export default function GasolinePage() {
     return gallons * (CI_kg_gal || defaultCI);
   };
 
+  const updateHouseholdGasoline = async () => {
+    if (!user) return;
+
+    try {
+      const twelveMonthsAgo = new Date();
+      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+      const cutoffDate = twelveMonthsAgo.toISOString().split('T')[0];
+
+      const { data: recentData, error: fetchError } = await supabase
+        .from('gasoline')
+        .select('*')
+        .eq('user_id', user.id)
+        .gte('date', cutoffDate)
+        .order('date', { ascending: true });
+
+      if (fetchError) throw fetchError;
+
+      if (!recentData || recentData.length === 0) {
+        console.log('No gasoline data found for the last 12 months');
+        return;
+      }
+
+      const monthlyTotals: { [key: string]: { sum: number; count: number } } = {};
+      
+      recentData.forEach(entry => {
+        const month = new Date(entry.date).toLocaleString('default', { month: 'long', year: 'numeric' });
+        if (!monthlyTotals[month]) {
+          monthlyTotals[month] = { sum: 0, count: 0 };
+        }
+        monthlyTotals[month].sum += entry.CO2e_kg;
+        monthlyTotals[month].count += 1;
+      });
+
+      const monthlyAverages = Object.values(monthlyTotals).map(
+        ({ sum, count }) => sum / count
+      );
+      const overallAverage = monthlyAverages.reduce((a, b) => a + b, 0) / monthlyAverages.length;
+
+      const { error: updateError } = await supabase
+        .from('households')
+        .update({ gasoline: overallAverage })
+        .eq('user_id', user.id);
+
+      if (updateError) throw updateError;
+
+      console.log('Updated household gasoline value:', overallAverage);
+    } catch (error) {
+      console.error('Error updating household gasoline value:', error);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -227,6 +278,8 @@ export default function GasolinePage() {
 
         if (error) throw error;
       }
+
+      await updateHouseholdGasoline();
 
       setSuccess('Gasoline data saved successfully!');
       setIsNewEntry(true);
