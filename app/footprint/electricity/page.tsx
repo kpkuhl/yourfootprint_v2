@@ -11,7 +11,7 @@ type ElectricityData = {
   end_date: string;
   amount_kWh: number;
   CI_kg_kWh: number | null;
-  CO2e: number | null;
+  CO2e: number;
 };
 
 type ConversionFactor = {
@@ -31,7 +31,7 @@ export default function ElectricityPage() {
     end_date: '',
     amount_kWh: 0,
     CI_kg_kWh: null,
-    CO2e: null
+    CO2e: 0
   });
   const [inputAmount, setInputAmount] = useState<number>(0);
   const [inputUnit, setInputUnit] = useState<string>('kWh');
@@ -130,7 +130,7 @@ export default function ElectricityPage() {
           end_date: today.toISOString().split('T')[0],
           amount_kWh: 0,
           CI_kg_kWh: null,
-          CO2e: null
+          CO2e: 0
         });
       }
     };
@@ -153,9 +153,10 @@ export default function ElectricityPage() {
     return amount * conversion.factor;
   };
 
-  const calculateCO2e = (amount_kWh: number, CI_kg_kWh: number | null): number | null => {
-    if (!CI_kg_kWh) return null;
-    return amount_kWh * CI_kg_kWh;
+  const calculateCO2e = (amount_kWh: number, CI_kg_kWh: number | null): number => {
+    // If no carbon intensity provided, use a default value
+    const defaultCI = 0.0004; // kg CO2e/kWh
+    return amount_kWh * (CI_kg_kWh || defaultCI);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -194,7 +195,7 @@ export default function ElectricityPage() {
         end_date: today.toISOString().split('T')[0],
         amount_kWh: 0,
         CI_kg_kWh: null,
-        CO2e: null
+        CO2e: 0
       });
       setInputAmount(0);
       setInputUnit('kWh');
