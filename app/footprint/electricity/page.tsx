@@ -121,8 +121,8 @@ export default function ElectricityPage() {
         .from('electricity')
         .insert([{
           user_id: user.id,
-          start_date: new Date(electricityData.start_date).toISOString(),
-          end_date: new Date(electricityData.end_date).toISOString(),
+          start_date: electricityData.start_date,
+          end_date: electricityData.end_date,
           amount: electricityData.amount,
           units: electricityData.units,
           CI_kg_kWh: electricityData.CI_kg_kWh
@@ -142,7 +142,7 @@ export default function ElectricityPage() {
         end_date: today.toISOString().split('T')[0],
         amount: 0,
         units: 'kWh',
-        CI_kg_kWh: 0.0004
+        CI_kg_kWh: null
       });
       setIsNewEntry(true);
     } catch (error) {
