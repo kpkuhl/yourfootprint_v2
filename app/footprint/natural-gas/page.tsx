@@ -30,9 +30,9 @@ type NaturalGasData = {
   user_id: string;
   start_date: string;
   end_date: string;
-  amount_therms: number;
+  amount_therm: number;
   CI_kg_therm: number | null;
-  CO2e: number;
+  CO2e_kg: number;
 };
 
 type ConversionFactor = {
@@ -79,9 +79,9 @@ export default function NaturalGasPage() {
     user_id: '',
     start_date: '',
     end_date: '',
-    amount_therms: 0,
+    amount_therm: 0,
     CI_kg_therm: null,
-    CO2e: 0
+    CO2e_kg: 0
   });
   const [inputAmount, setInputAmount] = useState<number>(0);
   const [inputUnit, setInputUnit] = useState<string>('therms');
@@ -105,7 +105,7 @@ export default function NaturalGasPage() {
         try {
           const parsedData = JSON.parse(savedData);
           setNaturalGasData(parsedData);
-          setInputAmount(parsedData.amount_therms);
+          setInputAmount(parsedData.amount_therm);
           setInputUnit('therms');
         } catch (e) {
           console.error('Error parsing saved form data:', e);
@@ -164,7 +164,7 @@ export default function NaturalGasPage() {
       
       if (data) {
         setNaturalGasData(data);
-        setInputAmount(data.amount_therms);
+        setInputAmount(data.amount_therm);
         setInputUnit('therms');
       } else {
         const today = new Date();
@@ -173,9 +173,9 @@ export default function NaturalGasPage() {
           user_id: user.id,
           start_date: lastMonth.toISOString().split('T')[0],
           end_date: today.toISOString().split('T')[0],
-          amount_therms: 0,
+          amount_therm: 0,
           CI_kg_therm: null,
-          CO2e: 0
+          CO2e_kg: 0
         });
       }
     };
@@ -203,7 +203,7 @@ export default function NaturalGasPage() {
       const monthlyValues = data.map(entry => ({
         id: entry.id,
         month: getMajorityMonth(entry.start_date, entry.end_date),
-        CO2e: entry.CO2e
+        CO2e: entry.CO2e_kg
       }));
 
       setMonthlyData(monthlyValues);
@@ -227,9 +227,9 @@ export default function NaturalGasPage() {
     return amount * conversion.factor;
   };
 
-  const calculateCO2e = (amount_therms: number, CI_kg_therm: number | null): number => {
+  const calculateCO2e = (amount_therm: number, CI_kg_therm: number | null): number => {
     const defaultCI = 0.0053; // kg CO2e/therm
-    return amount_therms * (CI_kg_therm || defaultCI);
+    return amount_therm * (CI_kg_therm || defaultCI);
   };
 
   const updateHouseholdNaturalGas = async () => {
@@ -261,7 +261,7 @@ export default function NaturalGasPage() {
         if (!monthlyTotals[month]) {
           monthlyTotals[month] = { sum: 0, count: 0 };
         }
-        monthlyTotals[month].sum += entry.CO2e;
+        monthlyTotals[month].sum += entry.CO2e_kg;
         monthlyTotals[month].count += 1;
       });
 
@@ -292,9 +292,9 @@ export default function NaturalGasPage() {
     setError(null);
 
     try {
-      const amount_therms = convertToTherms(inputAmount, inputUnit);
+      const amount_therm = convertToTherms(inputAmount, inputUnit);
       const CI_kg_therm = inputCI === '' ? null : Number(inputCI);
-      const CO2e = calculateCO2e(amount_therms, CI_kg_therm);
+      const CO2e_kg = calculateCO2e(amount_therm, CI_kg_therm);
 
       const { error } = await supabase
         .from('natural_gas')
@@ -302,9 +302,9 @@ export default function NaturalGasPage() {
           user_id: user.id,
           start_date: naturalGasData.start_date,
           end_date: naturalGasData.end_date,
-          amount_therms: Number(amount_therms),
+          amount_therm: Number(amount_therm),
           CI_kg_therm: CI_kg_therm,
-          CO2e: Number(CO2e)
+          CO2e_kg: Number(CO2e_kg)
         }]);
 
       if (error) throw error;
@@ -319,9 +319,9 @@ export default function NaturalGasPage() {
         user_id: user.id,
         start_date: lastMonth.toISOString().split('T')[0],
         end_date: today.toISOString().split('T')[0],
-        amount_therms: 0,
+        amount_therm: 0,
         CI_kg_therm: null,
-        CO2e: 0
+        CO2e_kg: 0
       });
       setInputAmount(0);
       setInputUnit('therms');
@@ -406,7 +406,7 @@ export default function NaturalGasPage() {
       const finalForm = {
         ...editForm,
         CI_kg_therm: finalCI,
-        CO2e: calculateCO2e(editForm.amount_therms, finalCI)
+        CO2e_kg: calculateCO2e(editForm.amount_therm, finalCI)
       };
 
       const { error } = await supabase
@@ -414,9 +414,9 @@ export default function NaturalGasPage() {
         .update({
           start_date: finalForm.start_date,
           end_date: finalForm.end_date,
-          amount_therms: finalForm.amount_therms,
+          amount_therm: finalForm.amount_therm,
           CI_kg_therm: finalForm.CI_kg_therm,
-          CO2e: finalForm.CO2e
+          CO2e_kg: finalForm.CO2e_kg
         })
         .eq('id', editingId)
         .eq('user_id', user.id);
@@ -434,7 +434,7 @@ export default function NaturalGasPage() {
         entry.id === editingId ? {
           id: entry.id,
           month: newMonth,
-          CO2e: finalForm.CO2e
+          CO2e: finalForm.CO2e_kg
         } : entry
       ));
 
@@ -488,12 +488,12 @@ export default function NaturalGasPage() {
             ...prev!,
             [name]: value === '' ? 0 : Number(value)
           };
-          updated.CO2e = calculateCO2e(updated.amount_therms, updated.CI_kg_therm);
+          updated.CO2e_kg = calculateCO2e(updated.amount_therm, updated.CI_kg_therm);
           return updated;
         });
       }
     } else {
-      const newValue = name === 'amount_therms' || name === 'CO2e' 
+      const newValue = name === 'amount_therm' || name === 'CO2e_kg' 
         ? Number(value) 
         : value;
 
@@ -503,8 +503,8 @@ export default function NaturalGasPage() {
           [name]: newValue
         };
 
-        if (name === 'amount_therms') {
-          updated.CO2e = calculateCO2e(
+        if (name === 'amount_therm') {
+          updated.CO2e_kg = calculateCO2e(
             newValue as number,
             updated.CI_kg_therm
           );
@@ -695,8 +695,8 @@ export default function NaturalGasPage() {
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <input
                                   type="text"
-                                  name="amount_therms"
-                                  value={editForm?.amount_therms}
+                                  name="amount_therm"
+                                  value={editForm?.amount_therm}
                                   onChange={handleEditChange}
                                   className="border rounded px-2 py-1 w-24"
                                 />
@@ -714,8 +714,8 @@ export default function NaturalGasPage() {
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <input
                                   type="text"
-                                  name="CO2e"
-                                  value={editForm?.CO2e}
+                                  name="CO2e_kg"
+                                  value={editForm?.CO2e_kg}
                                   onChange={handleEditChange}
                                   className="border rounded px-2 py-1 w-24"
                                 />
@@ -743,9 +743,9 @@ export default function NaturalGasPage() {
                               <td className="px-6 py-4 whitespace-nowrap">
                                 {new Date(entry.start_date).toLocaleDateString()} to {new Date(entry.end_date).toLocaleDateString()}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap">{entry.amount_therms}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">{entry.amount_therm}</td>
                               <td className="px-6 py-4 whitespace-nowrap">{entry.CI_kg_therm || 'N/A'}</td>
-                              <td className="px-6 py-4 whitespace-nowrap">{entry.CO2e}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">{entry.CO2e_kg}</td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <button
                                   onClick={() => handleEdit(entry)}
