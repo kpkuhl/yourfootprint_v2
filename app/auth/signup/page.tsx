@@ -25,11 +25,12 @@ export default function SignUp() {
         options: {
           data: {
             footprint_data: {
-              transportation: 0,
-              home_electricity: 0,
-              home_natural_gas: 0,
-              food: 0,
+              electricity: 0,
+              natural_gas: 0,
               water: 0,
+              gasoline: 0,
+              air_travel: 0,
+              food: 0,
               stuff: 0
             }
           }

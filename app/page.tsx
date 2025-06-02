@@ -190,7 +190,40 @@ export default function Home() {
 
           <div className="w-full bg-white p-6 rounded-lg shadow">
             <h2 className="text-2xl font-bold mb-4">Update Your Footprint Data</h2>
-            <FootprintForm />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <Link href="/footprint/electricity" className="p-4 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
+                <h3 className="font-semibold text-indigo-700">Electricity</h3>
+                <p className="text-sm text-gray-600">Update your electricity usage</p>
+              </Link>
+              <Link href="/footprint/natural-gas" className="p-4 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
+                <h3 className="font-semibold text-indigo-700">Natural Gas</h3>
+                <p className="text-sm text-gray-600">Update your natural gas usage</p>
+              </Link>
+              <Link href="/footprint/water" className="p-4 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
+                <h3 className="font-semibold text-indigo-700">Water</h3>
+                <p className="text-sm text-gray-600">Update your water usage</p>
+              </Link>
+              <Link href="/footprint/gasoline" className="p-4 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
+                <h3 className="font-semibold text-indigo-700">Gasoline</h3>
+                <p className="text-sm text-gray-600">Update your gasoline usage</p>
+              </Link>
+              <Link href="/footprint/air-travel" className="p-4 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
+                <h3 className="font-semibold text-indigo-700">Air Travel</h3>
+                <p className="text-sm text-gray-600">Update your air travel</p>
+              </Link>
+              <Link href="/footprint/food" className="p-4 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
+                <h3 className="font-semibold text-indigo-700">Food</h3>
+                <p className="text-sm text-gray-600">Update your food consumption</p>
+              </Link>
+              <Link href="/footprint/stuff" className="p-4 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
+                <h3 className="font-semibold text-indigo-700">Stuff</h3>
+                <p className="text-sm text-gray-600">Update your material consumption</p>
+              </Link>
+              <Link href="/household/details" className="p-4 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
+                <h3 className="font-semibold text-indigo-700">Household Details</h3>
+                <p className="text-sm text-gray-600">Update your household information</p>
+              </Link>
+            </div>
           </div>
         </div>
       )}
