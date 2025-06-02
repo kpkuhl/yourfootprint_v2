@@ -174,6 +174,8 @@ export default function FootprintForm() {
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
             min="1"
             required
+            inputMode="numeric"
+            pattern="[0-9]*"
           />
         </div>
         <div>
@@ -186,6 +188,8 @@ export default function FootprintForm() {
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
             min="0"
             required
+            inputMode="numeric"
+            pattern="[0-9]*"
           />
         </div>
         <div>
@@ -198,6 +202,8 @@ export default function FootprintForm() {
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
             min="0"
             required
+            inputMode="numeric"
+            pattern="[0-9]*"
           />
         </div>
         <div>
@@ -208,8 +214,9 @@ export default function FootprintForm() {
             value={formData.electricity}
             onChange={handleChange}
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-            step="0.01"
+            min="0"
             required
+            inputMode="decimal"
           />
         </div>
         <div>
@@ -220,8 +227,9 @@ export default function FootprintForm() {
             value={formData.natural_gas}
             onChange={handleChange}
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-            step="0.01"
+            min="0"
             required
+            inputMode="decimal"
           />
         </div>
         <div>
@@ -232,8 +240,9 @@ export default function FootprintForm() {
             value={formData.water}
             onChange={handleChange}
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-            step="0.01"
+            min="0"
             required
+            inputMode="decimal"
           />
         </div>
         <div>
@@ -244,8 +253,9 @@ export default function FootprintForm() {
             value={formData.gasoline}
             onChange={handleChange}
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-            step="0.01"
+            min="0"
             required
+            inputMode="decimal"
           />
         </div>
         <div>
@@ -256,8 +266,9 @@ export default function FootprintForm() {
             value={formData.air_travel}
             onChange={handleChange}
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-            step="0.01"
+            min="0"
             required
+            inputMode="decimal"
           />
         </div>
         <div>
@@ -268,8 +279,9 @@ export default function FootprintForm() {
             value={formData.food}
             onChange={handleChange}
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-            step="0.01"
+            min="0"
             required
+            inputMode="decimal"
           />
         </div>
         <div>
@@ -280,8 +292,9 @@ export default function FootprintForm() {
             value={formData.stuff}
             onChange={handleChange}
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-            step="0.01"
+            min="0"
             required
+            inputMode="decimal"
           />
         </div>
       </div>
