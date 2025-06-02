@@ -27,40 +27,43 @@ export default function Home() {
 
   useEffect(() => {
     const fetchHouseholdData = async () => {
+      if (!user) return;
+
       try {
-        console.log('Attempting to fetch household data for ID: feb53b61-63b0-461a-944b-d3d7028996d2');
-        
-        const { data, error } = await supabase
+        // First, fetch the average US household data
+        const { data: averageData, error: averageError } = await supabase
           .from('households')
           .select('*')
-          .eq('id', 'feb53b61-63b0-461a-944b-d3d7028996d2')
+          .eq('name', 'average us')
           .single();
-        
-        console.log('Supabase response:', { data, error });
-        
-        if (error) {
-          console.error('Error fetching household:', error);
-          throw error;
+
+        if (averageError) {
+          console.error('Error fetching average household data:', averageError);
+          throw averageError;
         }
 
-        if (data) {
-          console.log('Found household data:', {
-            ...data,
-            sq_ft: data.sq_ft || 'Not specified'
-          });
-          setFootprintData({
-            electricity: data.electricity || 0,
-            natural_gas: data.natural_gas || 0,
-            water: data.water || 0,
-            gasoline: data.gasoline || 0,
-            air_travel: data.air_travel || 0,
-            food: data.food || 0,
-            stuff: data.stuff || 0
-          });
-        } else {
-          console.error('No data found for ID: feb53b61-63b0-461a-944b-d3d7028996d2');
-          throw new Error('No data found for the specified household ID');
+        // Then fetch the user's household data
+        const { data: userData, error: userError } = await supabase
+          .from('households')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (userError && userError.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
+          console.error('Error fetching user household:', userError);
+          throw userError;
         }
+
+        // Merge user data with average data, using user data when available
+        setFootprintData({
+          electricity: userData?.electricity || averageData.electricity,
+          natural_gas: userData?.natural_gas || averageData.natural_gas,
+          water: userData?.water || averageData.water,
+          gasoline: userData?.gasoline || averageData.gasoline,
+          air_travel: userData?.air_travel || averageData.air_travel,
+          food: userData?.food || averageData.food,
+          stuff: userData?.stuff || averageData.stuff
+        });
       } catch (error) {
         console.error('Error in fetchHouseholdData:', error);
         setError(error instanceof Error ? error.message : 'An error occurred while fetching data');
@@ -132,7 +135,7 @@ export default function Home() {
       },
       title: {
         display: true,
-        text: 'Average Monthly US Household Carbon Footprint by Category',
+        text: 'Your Monthly Carbon Footprint by Category',
       },
     },
   };
