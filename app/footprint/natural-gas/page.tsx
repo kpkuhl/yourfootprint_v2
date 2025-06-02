@@ -80,12 +80,12 @@ export default function NaturalGasPage() {
     start_date: '',
     end_date: '',
     amount_therm: 0,
-    CI_kg_therm: 5.291,
+    CI_kg_therm: null,
     CO2e_kg: 0
   });
   const [inputAmount, setInputAmount] = useState<number>(0);
   const [inputUnit, setInputUnit] = useState<string>('therms');
-  const [inputCI, setInputCI] = useState<string>('5.291');
+  const [inputCI, setInputCI] = useState<string>('');
   const [conversionFactors, setConversionFactors] = useState<ConversionFactor[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -95,7 +95,7 @@ export default function NaturalGasPage() {
   const [rawData, setRawData] = useState<NaturalGasData[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<NaturalGasData | null>(null);
-  const [inputEditCI, setInputEditCI] = useState<string>('5.291');
+  const [inputEditCI, setInputEditCI] = useState<string>('');
 
   // Load saved form data from localStorage
   useEffect(() => {
@@ -321,12 +321,12 @@ export default function NaturalGasPage() {
         start_date: lastMonth.toISOString().split('T')[0],
         end_date: today.toISOString().split('T')[0],
         amount_therm: 0,
-        CI_kg_therm: 5.291,
+        CI_kg_therm: null,
         CO2e_kg: 0
       });
       setInputAmount(0);
       setInputUnit('therms');
-      setInputCI('5.291');
+      setInputCI('');
       setIsNewEntry(true);
     } catch (error) {
       console.error('Error saving natural gas data:', error);
@@ -441,7 +441,7 @@ export default function NaturalGasPage() {
 
       setEditingId(null);
       setEditForm(null);
-      setInputEditCI('5.291');
+      setInputEditCI('');
       setSuccess('Entry updated successfully!');
     } catch (error) {
       console.error('Error updating entry:', error);
@@ -474,7 +474,7 @@ export default function NaturalGasPage() {
   const handleEdit = (entry: NaturalGasData) => {
     setEditingId(entry.id);
     setEditForm(entry);
-    setInputEditCI(entry.CI_kg_therm?.toString() || '5.291');
+    setInputEditCI(entry.CI_kg_therm?.toString() || '');
   };
 
   const handleEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -625,7 +625,7 @@ export default function NaturalGasPage() {
                     value={inputCI}
                     onChange={handleChange}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                    placeholder="5.291"
+                    placeholder="Enter value or leave blank for default"
                     min="0"
                     step="0.01"
                   />
