@@ -155,7 +155,7 @@ export default function ElectricityPage() {
 
   const calculateCO2e = (amount_kWh: number, CI_kg_kWh: number | null): number => {
     // If no carbon intensity provided, use a default value
-    const defaultCI = 0.0004; // kg CO2e/kWh
+    const defaultCI = 0.0004; // kg CO2e/kWh (double precision)
     return amount_kWh * (CI_kg_kWh || defaultCI);
   };
 
@@ -176,9 +176,9 @@ export default function ElectricityPage() {
           user_id: user.id,
           start_date: electricityData.start_date,
           end_date: electricityData.end_date,
-          amount_kWh,
-          CI_kg_kWh: electricityData.CI_kg_kWh,
-          CO2e
+          amount_kWh: Number(amount_kWh),  // Ensure double precision
+          CI_kg_kWh: electricityData.CI_kg_kWh ? Number(electricityData.CI_kg_kWh) : null,  // Ensure double precision
+          CO2e: Number(CO2e)  // Ensure double precision
         }]);
 
       if (error) throw error;
