@@ -117,13 +117,9 @@ export default function ElectricityPage() {
     setError(null);
 
     try {
-      // Generate a new UUID for the entry
-      const newId = crypto.randomUUID();
-      
       const { error } = await supabase
         .from('electricity')
         .insert([{
-          id: newId,
           user_id: user.id,
           start_date: new Date(electricityData.start_date).toISOString(),
           end_date: new Date(electricityData.end_date).toISOString(),
