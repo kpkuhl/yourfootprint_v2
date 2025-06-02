@@ -194,6 +194,8 @@ export default function GasolinePage() {
       twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
       const cutoffDate = twelveMonthsAgo.toISOString().split('T')[0];
 
+      console.log('Fetching gasoline data since:', cutoffDate);
+
       const { data: recentData, error: fetchError } = await supabase
         .from('gasoline')
         .select('*')
@@ -201,12 +203,17 @@ export default function GasolinePage() {
         .gte('date', cutoffDate)
         .order('date', { ascending: true });
 
-      if (fetchError) throw fetchError;
+      if (fetchError) {
+        console.error('Error fetching gasoline data:', fetchError);
+        throw fetchError;
+      }
 
       if (!recentData || recentData.length === 0) {
         console.log('No gasoline data found for the last 12 months');
         return;
       }
+
+      console.log('Found gasoline data entries:', recentData.length);
 
       const monthlyTotals: { [key: string]: { sum: number; count: number } } = {};
       
@@ -219,21 +226,53 @@ export default function GasolinePage() {
         monthlyTotals[month].count += 1;
       });
 
+      console.log('Monthly totals:', monthlyTotals);
+
       const monthlyAverages = Object.values(monthlyTotals).map(
         ({ sum, count }) => sum / count
       );
       const overallAverage = monthlyAverages.reduce((a, b) => a + b, 0) / monthlyAverages.length;
 
-      const { error: updateError } = await supabase
+      console.log('Calculated overall average:', overallAverage);
+
+      // First check if the household record exists
+      const { data: householdData, error: householdError } = await supabase
         .from('households')
-        .update({ gasoline: overallAverage })
-        .eq('user_id', user.id);
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
 
-      if (updateError) throw updateError;
+      if (householdError) {
+        console.error('Error checking household record:', householdError);
+        throw householdError;
+      }
 
-      console.log('Updated household gasoline value:', overallAverage);
+      if (!householdData) {
+        console.log('Creating new household record');
+        const { error: insertError } = await supabase
+          .from('households')
+          .insert([{ user_id: user.id, gasoline: overallAverage }]);
+
+        if (insertError) {
+          console.error('Error creating household record:', insertError);
+          throw insertError;
+        }
+      } else {
+        console.log('Updating existing household record');
+        const { error: updateError } = await supabase
+          .from('households')
+          .update({ gasoline: overallAverage })
+          .eq('user_id', user.id);
+
+        if (updateError) {
+          console.error('Error updating household record:', updateError);
+          throw updateError;
+        }
+      }
+
+      console.log('Successfully updated household gasoline value:', overallAverage);
     } catch (error) {
-      console.error('Error updating household gasoline value:', error);
+      console.error('Error in updateHouseholdGasoline:', error);
     }
   };
 
