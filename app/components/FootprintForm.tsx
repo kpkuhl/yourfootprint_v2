@@ -100,25 +100,63 @@ export default function FootprintForm() {
         formData.food +
         formData.stuff;
 
-      const { error } = await supabase
+      // First, check if a household record exists for this user
+      const { data: existingHousehold, error: fetchError } = await supabase
         .from('households')
-        .upsert({
-          user_id: user.id,
-          num_members: formData.num_members,
-          num_vehicles: formData.num_vehicles,
-          zipcode: formData.zipcode,
-          name: formData.name,
-          electricity: formData.electricity,
-          natural_gas: formData.natural_gas,
-          water: formData.water,
-          gasoline: formData.gasoline,
-          air_travel: formData.air_travel,
-          food: formData.food,
-          stuff: formData.stuff,
-          sq_ft: formData.sq_ft,
-          total_monthly_co2e,
-          updated_at: new Date().toISOString(),
-        });
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
+        throw fetchError;
+      }
+
+      let error;
+      if (existingHousehold) {
+        // Update existing record
+        const { error: updateError } = await supabase
+          .from('households')
+          .update({
+            num_members: formData.num_members,
+            num_vehicles: formData.num_vehicles,
+            zipcode: formData.zipcode,
+            name: formData.name,
+            electricity: formData.electricity,
+            natural_gas: formData.natural_gas,
+            water: formData.water,
+            gasoline: formData.gasoline,
+            air_travel: formData.air_travel,
+            food: formData.food,
+            stuff: formData.stuff,
+            sq_ft: formData.sq_ft,
+            total_monthly_co2e,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('user_id', user.id);
+        error = updateError;
+      } else {
+        // Insert new record
+        const { error: insertError } = await supabase
+          .from('households')
+          .insert({
+            user_id: user.id,
+            num_members: formData.num_members,
+            num_vehicles: formData.num_vehicles,
+            zipcode: formData.zipcode,
+            name: formData.name,
+            electricity: formData.electricity,
+            natural_gas: formData.natural_gas,
+            water: formData.water,
+            gasoline: formData.gasoline,
+            air_travel: formData.air_travel,
+            food: formData.food,
+            stuff: formData.stuff,
+            sq_ft: formData.sq_ft,
+            total_monthly_co2e,
+            updated_at: new Date().toISOString(),
+          });
+        error = insertError;
+      }
 
       if (error) throw error;
 
