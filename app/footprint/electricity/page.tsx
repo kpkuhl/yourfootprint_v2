@@ -73,6 +73,14 @@ function getMajorityMonth(startDate: string, endDate: string): string {
   return endMonth.toISOString().slice(0, 7);
 }
 
+// Helper function to format dates correctly
+function formatDate(dateString: string): string {
+  const date = new Date(dateString);
+  // Add timezone offset to ensure correct date display
+  date.setMinutes(date.getMinutes() + date.getTimezoneOffset());
+  return date.toLocaleDateString();
+}
+
 export default function ElectricityPage() {
   const { user } = useAuth();
   const [electricityData, setElectricityData] = useState<ElectricityData>({
@@ -777,7 +785,7 @@ export default function ElectricityPage() {
                           ) : (
                             <>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                {new Date(entry.start_date).toLocaleDateString()} to {new Date(entry.end_date).toLocaleDateString()}
+                                {formatDate(entry.start_date)} to {formatDate(entry.end_date)}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">{entry.amount_kWh}</td>
                               <td className="px-6 py-4 whitespace-nowrap">{entry.CI_kg_kWh || 'N/A'}</td>

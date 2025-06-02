@@ -73,6 +73,14 @@ function getMajorityMonth(startDate: string, endDate: string): string {
   return endMonth.toISOString().slice(0, 7);
 }
 
+// Helper function to format dates correctly
+function formatDate(dateString: string): string {
+  const date = new Date(dateString);
+  // Add timezone offset to ensure correct date display
+  date.setMinutes(date.getMinutes() + date.getTimezoneOffset());
+  return date.toLocaleDateString();
+}
+
 export default function NaturalGasPage() {
   const { user } = useAuth();
   const [naturalGasData, setNaturalGasData] = useState<NaturalGasData>({
@@ -744,7 +752,7 @@ export default function NaturalGasPage() {
                           ) : (
                             <>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                {new Date(entry.start_date).toLocaleDateString()} to {new Date(entry.end_date).toLocaleDateString()}
+                                {formatDate(entry.start_date)} to {formatDate(entry.end_date)}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">{entry.amount_therm}</td>
                               <td className="px-6 py-4 whitespace-nowrap">{entry.CI_kg_therm || 'N/A'}</td>
