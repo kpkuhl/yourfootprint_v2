@@ -14,6 +14,8 @@ type ElectricityData = {
   CI_kg_kWh: number | null;
 };
 
+const STORAGE_KEY = 'electricity_form_data';
+
 export default function ElectricityPage() {
   const { user } = useAuth();
   const [electricityData, setElectricityData] = useState<ElectricityData>({
@@ -28,6 +30,28 @@ export default function ElectricityPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isNewEntry, setIsNewEntry] = useState(true);
+
+  // Load saved form data from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedData = localStorage.getItem(STORAGE_KEY);
+      if (savedData) {
+        try {
+          const parsedData = JSON.parse(savedData);
+          setElectricityData(parsedData);
+        } catch (e) {
+          console.error('Error parsing saved form data:', e);
+        }
+      }
+    }
+  }, []);
+
+  // Save form data to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined' && electricityData.amount !== 0) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(electricityData));
+    }
+  }, [electricityData]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -95,14 +119,17 @@ export default function ElectricityPage() {
       // Reset form for new entry
       const today = new Date();
       const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      setElectricityData(prev => ({
-        ...prev,
+      const newData = {
+        ...electricityData,
         id: undefined,
         start_date: lastMonth.toISOString().split('T')[0],
         end_date: today.toISOString().split('T')[0],
         amount: 0,
         CI_kg_kWh: null
-      }));
+      };
+      setElectricityData(newData);
+      // Clear localStorage after successful submission
+      localStorage.removeItem(STORAGE_KEY);
       setIsNewEntry(true);
     } catch (error) {
       console.error('Error updating electricity data:', error);
@@ -117,6 +144,15 @@ export default function ElectricityPage() {
       [name]: name === 'amount' || name === 'CI_kg_kWh' ? Number(value) : value
     }));
   };
+
+  // Clear form data when component unmounts
+  useEffect(() => {
+    return () => {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    };
+  }, []);
 
   if (!user) {
     return (
