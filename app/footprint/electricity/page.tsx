@@ -117,10 +117,13 @@ export default function ElectricityPage() {
     setError(null);
 
     try {
+      // Create a new object without the id field
+      const { id, ...dataToInsert } = electricityData;
+      
       const { error } = await supabase
         .from('electricity')
         .insert([{
-          ...electricityData,
+          ...dataToInsert,
           start_date: new Date(electricityData.start_date).toISOString(),
           end_date: new Date(electricityData.end_date).toISOString()
         }]);
