@@ -213,13 +213,20 @@ export default function ElectricityPage() {
     console.log('Form field changed:', name, value);
     
     if (name === 'amount') {
-      setInputAmount(Number(value));
+      // Allow numbers starting with zero
+      setInputAmount(value === '' ? 0 : Number(value));
     } else if (name === 'unit') {
       setInputUnit(value);
+    } else if (name === 'CI_kg_kWh') {
+      // Allow numbers starting with zero
+      setElectricityData(prev => ({
+        ...prev,
+        [name]: value === '' ? null : Number(value)
+      }));
     } else {
       setElectricityData(prev => ({
         ...prev,
-        [name]: name === 'CI_kg_kWh' ? Number(value) : value
+        [name]: value
       }));
     }
   };
