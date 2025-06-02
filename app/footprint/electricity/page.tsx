@@ -380,34 +380,69 @@ export default function ElectricityPage() {
     setEditForm(entry);
   };
 
+  const handleEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    if (!editForm) return;
+
+    const newValue = name === 'amount_kWh' || name === 'CI_kg_kWh' || name === 'CO2e' 
+      ? Number(value) 
+      : value;
+
+    setEditForm(prev => {
+      const updated = {
+        ...prev!,
+        [name]: newValue
+      };
+
+      // Recalculate CO2e if amount or carbon intensity changes
+      if (name === 'amount_kWh' || name === 'CI_kg_kWh') {
+        updated.CO2e = calculateCO2e(
+          name === 'amount_kWh' ? newValue as number : updated.amount_kWh,
+          name === 'CI_kg_kWh' ? newValue as number : updated.CI_kg_kWh
+        );
+      }
+
+      return updated;
+    });
+  };
+
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !editingId || !editForm) return;
 
     try {
+      // Recalculate CO2e one final time before saving
+      const finalForm = {
+        ...editForm,
+        CO2e: calculateCO2e(editForm.amount_kWh, editForm.CI_kg_kWh)
+      };
+
       const { error } = await supabase
         .from('electricity')
         .update({
-          start_date: editForm.start_date,
-          end_date: editForm.end_date,
-          amount_kWh: editForm.amount_kWh,
-          CI_kg_kWh: editForm.CI_kg_kWh,
-          CO2e: editForm.CO2e
+          start_date: finalForm.start_date,
+          end_date: finalForm.end_date,
+          amount_kWh: finalForm.amount_kWh,
+          CI_kg_kWh: finalForm.CI_kg_kWh,
+          CO2e: finalForm.CO2e
         })
         .eq('id', editingId)
         .eq('user_id', user.id);
 
       if (error) throw error;
 
+      // Get the new majority month
+      const newMonth = getMajorityMonth(finalForm.start_date, finalForm.end_date);
+
       // Refresh data after update
       setRawData(prev => prev.map(entry => 
-        entry.id === editingId ? editForm : entry
+        entry.id === editingId ? finalForm : entry
       ));
       setMonthlyData(prev => prev.map(entry => 
         entry.id === editingId ? {
           id: entry.id,
-          month: getMajorityMonth(editForm.start_date, editForm.end_date),
-          CO2e: editForm.CO2e
+          month: newMonth,
+          CO2e: finalForm.CO2e
         } : entry
       ));
 
@@ -418,18 +453,6 @@ export default function ElectricityPage() {
       console.error('Error updating entry:', error);
       setError('Failed to update entry');
     }
-  };
-
-  const handleEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    if (!editForm) return;
-
-    setEditForm(prev => ({
-      ...prev!,
-      [name]: name === 'amount_kWh' || name === 'CI_kg_kWh' || name === 'CO2e' 
-        ? Number(value) 
-        : value
-    }));
   };
 
   if (!user) {
