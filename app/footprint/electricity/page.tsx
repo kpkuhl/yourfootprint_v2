@@ -3,6 +3,27 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../../utils/supabase';
 import Link from 'next/link';
+import { Line } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+} from 'chart.js';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 type ElectricityData = {
   id?: string;
@@ -21,7 +42,35 @@ type ConversionFactor = {
   data_type: string;
 };
 
+type MonthlyData = {
+  month: string;
+  CO2e: number;
+};
+
 const STORAGE_KEY = 'electricity_form_data';
+
+function getMajorityMonth(startDate: string, endDate: string): string {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  
+  // Calculate days in each month
+  const startMonth = new Date(start.getFullYear(), start.getMonth(), 1);
+  const endMonth = new Date(end.getFullYear(), end.getMonth() + 1, 0);
+  
+  const startMonthDays = Math.min(
+    end.getDate(),
+    new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate()
+  ) - start.getDate() + 1;
+  
+  const endMonthDays = end.getDate();
+  
+  // If more days in start month, use start month
+  if (startMonthDays > endMonthDays) {
+    return startMonth.toISOString().slice(0, 7); // Returns YYYY-MM
+  }
+  // Otherwise use end month
+  return endMonth.toISOString().slice(0, 7);
+}
 
 export default function ElectricityPage() {
   const { user } = useAuth();
@@ -41,6 +90,7 @@ export default function ElectricityPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isNewEntry, setIsNewEntry] = useState(true);
+  const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
 
   // Load saved form data from localStorage
   useEffect(() => {
@@ -139,6 +189,34 @@ export default function ElectricityPage() {
     fetchData();
   }, [user]);
 
+  // Add new useEffect to fetch and process data for plotting
+  useEffect(() => {
+    const fetchMonthlyData = async () => {
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('electricity')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('start_date', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching electricity data:', error);
+        return;
+      }
+
+      // Process data to get monthly values
+      const monthlyValues = data.map(entry => ({
+        month: getMajorityMonth(entry.start_date, entry.end_date),
+        CO2e: entry.CO2e
+      }));
+
+      setMonthlyData(monthlyValues);
+    };
+
+    fetchMonthlyData();
+  }, [user]);
+
   const convertToKWh = (amount: number, fromUnit: string): number => {
     if (fromUnit === 'kWh') return amount;
     
@@ -229,6 +307,46 @@ export default function ElectricityPage() {
     }
   };
 
+  const chartData = {
+    labels: monthlyData.map(d => d.month),
+    datasets: [
+      {
+        label: 'Monthly CO2e (kg)',
+        data: monthlyData.map(d => d.CO2e),
+        borderColor: 'rgb(75, 192, 192)',
+        tension: 0.1
+      }
+    ]
+  };
+
+  const chartOptions = {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: 'top' as const,
+      },
+      title: {
+        display: true,
+        text: 'Monthly Electricity CO2e Emissions'
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: 'kg CO2e'
+        }
+      },
+      x: {
+        title: {
+          display: true,
+          text: 'Month'
+        }
+      }
+    }
+  };
+
   if (!user) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-24">
@@ -256,111 +374,119 @@ export default function ElectricityPage() {
         {loading ? (
           <div className="text-lg">Loading...</div>
         ) : (
-          <div className="bg-white p-6 rounded-lg shadow">
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="start_date" className="block text-sm font-medium text-gray-700">
-                    Start Date
-                  </label>
-                  <input
-                    type="date"
-                    id="start_date"
-                    name="start_date"
-                    value={electricityData.start_date}
-                    onChange={handleChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                    required
-                  />
+          <>
+            <div className="bg-white p-6 rounded-lg shadow mb-8">
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="start_date" className="block text-sm font-medium text-gray-700">
+                      Start Date
+                    </label>
+                    <input
+                      type="date"
+                      id="start_date"
+                      name="start_date"
+                      value={electricityData.start_date}
+                      onChange={handleChange}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="end_date" className="block text-sm font-medium text-gray-700">
+                      End Date
+                    </label>
+                    <input
+                      type="date"
+                      id="end_date"
+                      name="end_date"
+                      value={electricityData.end_date}
+                      onChange={handleChange}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="amount" className="block text-sm font-medium text-gray-700">
+                      Amount
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      id="amount"
+                      name="amount"
+                      value={inputAmount}
+                      onChange={handleChange}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="unit" className="block text-sm font-medium text-gray-700">
+                      Units
+                    </label>
+                    <select
+                      id="unit"
+                      name="unit"
+                      value={inputUnit}
+                      onChange={handleChange}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      required
+                    >
+                      <option value="kWh">kWh</option>
+                      <option value="MWh">MWh</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div>
-                  <label htmlFor="end_date" className="block text-sm font-medium text-gray-700">
-                    End Date
-                  </label>
-                  <input
-                    type="date"
-                    id="end_date"
-                    name="end_date"
-                    value={electricityData.end_date}
-                    onChange={handleChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="amount" className="block text-sm font-medium text-gray-700">
-                    Amount
+                  <label htmlFor="CI_kg_kWh" className="block text-sm font-medium text-gray-700">
+                    Carbon Intensity (kg CO2e/kWh)
                   </label>
                   <input
                     type="text"
                     inputMode="decimal"
-                    id="amount"
-                    name="amount"
-                    value={inputAmount}
+                    id="CI_kg_kWh"
+                    name="CI_kg_kWh"
+                    value={inputCI}
                     onChange={handleChange}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    required
                   />
+                  <p className="mt-1 text-sm text-gray-500">
+                    Optional: Enter the carbon intensity of your electricity. If left blank, we'll use the average for your region.
+                  </p>
                 </div>
 
-                <div>
-                  <label htmlFor="unit" className="block text-sm font-medium text-gray-700">
-                    Units
-                  </label>
-                  <select
-                    id="unit"
-                    name="unit"
-                    value={inputUnit}
-                    onChange={handleChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                    required
-                  >
-                    <option value="kWh">kWh</option>
-                    <option value="MWh">MWh</option>
-                  </select>
-                </div>
+                {error && (
+                  <div className="text-red-500 text-sm">{error}</div>
+                )}
+
+                {success && (
+                  <div className="text-green-500 text-sm">
+                    {isNewEntry ? 'New electricity entry added successfully!' : 'Electricity data updated successfully!'}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  className="w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                >
+                  {isNewEntry ? 'Add New Electricity Entry' : 'Update Electricity Data'}
+                </button>
+              </form>
+            </div>
+
+            {monthlyData.length > 0 && (
+              <div className="bg-white p-6 rounded-lg shadow">
+                <Line data={chartData} options={chartOptions} />
               </div>
-
-              <div>
-                <label htmlFor="CI_kg_kWh" className="block text-sm font-medium text-gray-700">
-                  Carbon Intensity (kg CO2e/kWh)
-                </label>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  id="CI_kg_kWh"
-                  name="CI_kg_kWh"
-                  value={inputCI}
-                  onChange={handleChange}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                />
-                <p className="mt-1 text-sm text-gray-500">
-                  Optional: Enter the carbon intensity of your electricity. If left blank, we'll use the average for your region.
-                </p>
-              </div>
-
-              {error && (
-                <div className="text-red-500 text-sm">{error}</div>
-              )}
-
-              {success && (
-                <div className="text-green-500 text-sm">
-                  {isNewEntry ? 'New electricity entry added successfully!' : 'Electricity data updated successfully!'}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                className="w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
-              >
-                {isNewEntry ? 'Add New Electricity Entry' : 'Update Electricity Data'}
-              </button>
-            </form>
-          </div>
+            )}
+          </>
         )}
       </div>
     </main>
