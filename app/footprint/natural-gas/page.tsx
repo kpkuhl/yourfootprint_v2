@@ -290,6 +290,7 @@ export default function NaturalGasPage() {
 
     setLoading(true);
     setError(null);
+    setSuccess(null);
 
     try {
       const amount_therm = convertToTherms(inputAmount, inputUnit);
@@ -622,7 +623,7 @@ export default function NaturalGasPage() {
                     value={inputCI}
                     onChange={handleChange}
                     className="w-full p-2 border rounded focus:ring-2 focus:ring-indigo-500"
-                    placeholder="5.291 kg CO2e/therm"
+                    placeholder="5.291"
                     min="0"
                     step="0.01"
                   />
