@@ -35,6 +35,7 @@ export default function ElectricityPage() {
   });
   const [inputAmount, setInputAmount] = useState<number>(0);
   const [inputUnit, setInputUnit] = useState<string>('kWh');
+  const [inputCI, setInputCI] = useState<string>('');  // Store CI as string
   const [conversionFactors, setConversionFactors] = useState<ConversionFactor[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -168,7 +169,8 @@ export default function ElectricityPage() {
 
     try {
       const amount_kWh = convertToKWh(inputAmount, inputUnit);
-      const CO2e = calculateCO2e(amount_kWh, electricityData.CI_kg_kWh);
+      const CI_kg_kWh = inputCI === '' ? null : Number(inputCI);
+      const CO2e = calculateCO2e(amount_kWh, CI_kg_kWh);
 
       const { error } = await supabase
         .from('electricity')
@@ -176,9 +178,9 @@ export default function ElectricityPage() {
           user_id: user.id,
           start_date: electricityData.start_date,
           end_date: electricityData.end_date,
-          amount_kWh: Number(amount_kWh),  // Ensure double precision
-          CI_kg_kWh: electricityData.CI_kg_kWh ? Number(electricityData.CI_kg_kWh) : null,  // Ensure double precision
-          CO2e: Number(CO2e)  // Ensure double precision
+          amount_kWh: Number(amount_kWh),
+          CI_kg_kWh: CI_kg_kWh,
+          CO2e: Number(CO2e)
         }]);
 
       if (error) throw error;
@@ -199,6 +201,7 @@ export default function ElectricityPage() {
       });
       setInputAmount(0);
       setInputUnit('kWh');
+      setInputCI('');
       setIsNewEntry(true);
     } catch (error) {
       console.error('Error saving electricity data:', error);
@@ -213,16 +216,11 @@ export default function ElectricityPage() {
     console.log('Form field changed:', name, value);
     
     if (name === 'amount') {
-      // Allow numbers starting with zero
       setInputAmount(value === '' ? 0 : Number(value));
     } else if (name === 'unit') {
       setInputUnit(value);
     } else if (name === 'CI_kg_kWh') {
-      // Allow numbers starting with zero
-      setElectricityData(prev => ({
-        ...prev,
-        [name]: value === '' ? null : Number(value)
-      }));
+      setInputCI(value);  // Store as string
     } else {
       setElectricityData(prev => ({
         ...prev,
@@ -336,7 +334,7 @@ export default function ElectricityPage() {
                   inputMode="decimal"
                   id="CI_kg_kWh"
                   name="CI_kg_kWh"
-                  value={electricityData.CI_kg_kWh || ''}
+                  value={inputCI}
                   onChange={handleChange}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
