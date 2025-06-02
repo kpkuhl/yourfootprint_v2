@@ -246,6 +246,65 @@ export default function ElectricityPage() {
     return amount_kWh * (CI_kg_kWh || defaultCI);
   };
 
+  // Function to update households table with average monthly CO2e
+  const updateHouseholdElectricity = async () => {
+    if (!user) return;
+
+    try {
+      // Get the last 12 months of data
+      const twelveMonthsAgo = new Date();
+      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+      const cutoffDate = twelveMonthsAgo.toISOString().split('T')[0];
+
+      // Fetch electricity data for the last 12 months
+      const { data: recentData, error: fetchError } = await supabase
+        .from('electricity')
+        .select('*')
+        .eq('user_id', user.id)
+        .gte('start_date', cutoffDate)
+        .order('start_date', { ascending: true });
+
+      if (fetchError) throw fetchError;
+
+      if (!recentData || recentData.length === 0) {
+        console.log('No electricity data found for the last 12 months');
+        return;
+      }
+
+      // Calculate monthly averages
+      const monthlyTotals: { [key: string]: { sum: number; count: number } } = {};
+      
+      recentData.forEach(entry => {
+        const month = getMajorityMonth(entry.start_date, entry.end_date);
+        if (!monthlyTotals[month]) {
+          monthlyTotals[month] = { sum: 0, count: 0 };
+        }
+        monthlyTotals[month].sum += entry.CO2e;
+        monthlyTotals[month].count += 1;
+      });
+
+      // Calculate overall average
+      const monthlyAverages = Object.values(monthlyTotals).map(
+        ({ sum, count }) => sum / count
+      );
+      const overallAverage = monthlyAverages.reduce((a, b) => a + b, 0) / monthlyAverages.length;
+
+      // Update households table
+      const { error: updateError } = await supabase
+        .from('households')
+        .update({ electricity: overallAverage })
+        .eq('user_id', user.id);
+
+      if (updateError) throw updateError;
+
+      console.log('Successfully updated household electricity average:', overallAverage);
+    } catch (error) {
+      console.error('Error updating household electricity:', error);
+      setError('Failed to update household electricity average');
+    }
+  };
+
+  // Call updateHouseholdElectricity after successful form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -270,6 +329,9 @@ export default function ElectricityPage() {
         }]);
 
       if (error) throw error;
+
+      // Update household electricity average after successful submission
+      await updateHouseholdElectricity();
 
       setSuccess('Electricity data saved successfully!');
       // Clear localStorage after successful submission
@@ -355,6 +417,69 @@ export default function ElectricityPage() {
     }
   };
 
+  // Also update household electricity after successful edit
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !editingId || !editForm) return;
+
+    try {
+      // Convert CI_kg_kWh to number one final time
+      const finalCI = Number(inputEditCI);
+      if (isNaN(finalCI)) {
+        setError('Invalid carbon intensity value');
+        return;
+      }
+
+      // Recalculate CO2e one final time before saving
+      const finalForm = {
+        ...editForm,
+        CI_kg_kWh: finalCI,
+        CO2e: calculateCO2e(editForm.amount_kWh, finalCI)
+      };
+
+      const { error } = await supabase
+        .from('electricity')
+        .update({
+          start_date: finalForm.start_date,
+          end_date: finalForm.end_date,
+          amount_kWh: finalForm.amount_kWh,
+          CI_kg_kWh: finalForm.CI_kg_kWh,
+          CO2e: finalForm.CO2e
+        })
+        .eq('id', editingId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      // Update household electricity average after successful edit
+      await updateHouseholdElectricity();
+
+      // Get the new majority month
+      const newMonth = getMajorityMonth(finalForm.start_date, finalForm.end_date);
+
+      // Refresh data after update
+      setRawData(prev => prev.map(entry => 
+        entry.id === editingId ? finalForm : entry
+      ));
+      setMonthlyData(prev => prev.map(entry => 
+        entry.id === editingId ? {
+          id: entry.id,
+          month: newMonth,
+          CO2e: finalForm.CO2e
+        } : entry
+      ));
+
+      setEditingId(null);
+      setEditForm(null);
+      setInputEditCI('');
+      setSuccess('Entry updated successfully!');
+    } catch (error) {
+      console.error('Error updating entry:', error);
+      setError('Failed to update entry');
+    }
+  };
+
+  // Also update household electricity after successful deletion
   const handleDelete = async (id: string) => {
     if (!user) return;
 
@@ -366,6 +491,9 @@ export default function ElectricityPage() {
         .eq('user_id', user.id);
 
       if (error) throw error;
+
+      // Update household electricity average after successful deletion
+      await updateHouseholdElectricity();
 
       // Refresh data after deletion
       setRawData(prev => prev.filter(entry => entry.id !== id));
@@ -421,64 +549,6 @@ export default function ElectricityPage() {
 
         return updated;
       });
-    }
-  };
-
-  const handleEditSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user || !editingId || !editForm) return;
-
-    try {
-      // Convert CI_kg_kWh to number one final time
-      const finalCI = Number(inputEditCI);
-      if (isNaN(finalCI)) {
-        setError('Invalid carbon intensity value');
-        return;
-      }
-
-      // Recalculate CO2e one final time before saving
-      const finalForm = {
-        ...editForm,
-        CI_kg_kWh: finalCI,
-        CO2e: calculateCO2e(editForm.amount_kWh, finalCI)
-      };
-
-      const { error } = await supabase
-        .from('electricity')
-        .update({
-          start_date: finalForm.start_date,
-          end_date: finalForm.end_date,
-          amount_kWh: finalForm.amount_kWh,
-          CI_kg_kWh: finalForm.CI_kg_kWh,
-          CO2e: finalForm.CO2e
-        })
-        .eq('id', editingId)
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-
-      // Get the new majority month
-      const newMonth = getMajorityMonth(finalForm.start_date, finalForm.end_date);
-
-      // Refresh data after update
-      setRawData(prev => prev.map(entry => 
-        entry.id === editingId ? finalForm : entry
-      ));
-      setMonthlyData(prev => prev.map(entry => 
-        entry.id === editingId ? {
-          id: entry.id,
-          month: newMonth,
-          CO2e: finalForm.CO2e
-        } : entry
-      ));
-
-      setEditingId(null);
-      setEditForm(null);
-      setInputEditCI('');
-      setSuccess('Entry updated successfully!');
-    } catch (error) {
-      console.error('Error updating entry:', error);
-      setError('Failed to update entry');
     }
   };
 
