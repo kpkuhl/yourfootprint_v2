@@ -144,11 +144,35 @@ export default function GasolinePage() {
 
       setRawData(data || []);
 
-      // Process data to get monthly values
-      const monthlyValues = data.map(entry => ({
-        id: entry.id,
-        month: new Date(entry.date).toLocaleString('default', { month: 'long', year: 'numeric' }),
-        CO2e: entry.CO2e_kg
+      // Get the date range
+      const dates = data.map(entry => new Date(entry.date));
+      const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
+      const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+
+      // Create a map of all months in the range
+      const monthlyMap = new Map<string, { sum: number; count: number }>();
+      const currentDate = new Date(minDate);
+      while (currentDate <= maxDate) {
+        const monthKey = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+        monthlyMap.set(monthKey, { sum: 0, count: 0 });
+        currentDate.setMonth(currentDate.getMonth() + 1);
+      }
+
+      // Sum up emissions for each month
+      data.forEach(entry => {
+        const monthKey = new Date(entry.date).toLocaleString('default', { month: 'long', year: 'numeric' });
+        const monthData = monthlyMap.get(monthKey);
+        if (monthData) {
+          monthData.sum += entry.CO2e_kg;
+          monthData.count += 1;
+        }
+      });
+
+      // Convert to array and calculate averages
+      const monthlyValues = Array.from(monthlyMap.entries()).map(([month, data]) => ({
+        id: month, // Using month as ID since we're aggregating
+        month,
+        CO2e: data.sum // Using sum instead of average to show total monthly emissions
       }));
 
       setMonthlyData(monthlyValues);
