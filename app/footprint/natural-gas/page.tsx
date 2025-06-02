@@ -80,7 +80,7 @@ export default function NaturalGasPage() {
     start_date: '',
     end_date: '',
     amount_therm: 0,
-    CI_kg_therm: null,
+    CI_kg_therm: 5.291,
     CO2e_kg: 0
   });
   const [inputAmount, setInputAmount] = useState<number>(0);
@@ -288,13 +288,13 @@ export default function NaturalGasPage() {
     e.preventDefault();
     if (!user) return;
 
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
-
     try {
+      setLoading(true);
+      setError(null);
+      setSuccess(null);
+
       const amount_therm = convertToTherms(inputAmount, inputUnit);
-      const CI_kg_therm = inputCI === '' ? null : Number(inputCI);
+      const CI_kg_therm = inputCI === '' ? 5.291 : Number(inputCI);
       const CO2e_kg = calculateCO2e(amount_therm, CI_kg_therm);
 
       const { error } = await supabase
@@ -321,7 +321,7 @@ export default function NaturalGasPage() {
         start_date: lastMonth.toISOString().split('T')[0],
         end_date: today.toISOString().split('T')[0],
         amount_therm: 0,
-        CI_kg_therm: null,
+        CI_kg_therm: 5.291,
         CO2e_kg: 0
       });
       setInputAmount(0);
@@ -615,14 +615,16 @@ export default function NaturalGasPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="CI_kg_therm" className="block text-sm font-medium text-gray-700">
                     Carbon Intensity (kg CO2e/therm)
                   </label>
                   <input
                     type="number"
+                    id="CI_kg_therm"
+                    name="CI_kg_therm"
                     value={inputCI}
                     onChange={handleChange}
-                    className="w-full p-2 border rounded focus:ring-2 focus:ring-indigo-500"
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                     placeholder="5.291"
                     min="0"
                     step="0.01"
