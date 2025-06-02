@@ -1,0 +1,638 @@
+'use client';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../../utils/supabase';
+import Link from 'next/link';
+import { Line } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+} from 'chart.js';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+);
+
+type GasolineData = {
+  id?: string;
+  user_id: string;
+  date: string;
+  dollars: number | null;
+  dollar_gal: number | null;
+  gallons: number;
+  CI_kg_gal: number | null;
+  CO2e_kg: number;
+};
+
+type MonthlyData = {
+  id: string;
+  month: string;
+  CO2e: number;
+};
+
+const STORAGE_KEY = 'gasolineFormData';
+
+export default function GasolinePage() {
+  const { user } = useAuth();
+  const [gasolineData, setGasolineData] = useState<GasolineData>({
+    user_id: '',
+    date: '',
+    dollars: null,
+    dollar_gal: null,
+    gallons: 0,
+    CI_kg_gal: null,
+    CO2e_kg: 0
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [isNewEntry, setIsNewEntry] = useState(true);
+  const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
+  const [rawData, setRawData] = useState<GasolineData[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<GasolineData | null>(null);
+
+  // Load saved form data from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedData = localStorage.getItem(STORAGE_KEY);
+      if (savedData) {
+        try {
+          const parsedData = JSON.parse(savedData);
+          setGasolineData(parsedData);
+        } catch (e) {
+          console.error('Error parsing saved form data:', e);
+        }
+      }
+    }
+  }, []);
+
+  // Save form data to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined' && gasolineData.user_id) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(gasolineData));
+    }
+  }, [gasolineData]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!user) return;
+      
+      const savedData = localStorage.getItem(STORAGE_KEY);
+      if (savedData) {
+        return;
+      }
+      
+      const { data, error } = await supabase
+        .from('gasoline')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('date', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error) {
+        console.error('Error fetching data:', error);
+        return;
+      }
+      
+      if (data) {
+        setGasolineData(data);
+      } else {
+        const today = new Date();
+        setGasolineData({
+          user_id: user.id,
+          date: today.toISOString().split('T')[0],
+          dollars: null,
+          dollar_gal: null,
+          gallons: 0,
+          CI_kg_gal: null,
+          CO2e_kg: 0
+        });
+      }
+    };
+
+    fetchData();
+  }, [user]);
+
+  useEffect(() => {
+    const fetchMonthlyData = async () => {
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('gasoline')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('date', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching gasoline data:', error);
+        return;
+      }
+
+      setRawData(data || []);
+
+      // Process data to get monthly values
+      const monthlyValues = data.map(entry => ({
+        id: entry.id,
+        month: new Date(entry.date).toLocaleString('default', { month: 'long', year: 'numeric' }),
+        CO2e: entry.CO2e_kg
+      }));
+
+      setMonthlyData(monthlyValues);
+    };
+
+    fetchMonthlyData();
+  }, [user]);
+
+  const calculateCO2e = (gallons: number, CI_kg_gal: number | null): number => {
+    const defaultCI = 9.46; // kg CO2e/gallon
+    return gallons * (CI_kg_gal || defaultCI);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const CO2e_kg = calculateCO2e(gasolineData.gallons, gasolineData.CI_kg_gal);
+      const dataToSubmit = {
+        ...gasolineData,
+        CO2e_kg,
+        user_id: user.id
+      };
+
+      if (isNewEntry) {
+        const { error } = await supabase
+          .from('gasoline')
+          .insert([dataToSubmit]);
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('gasoline')
+          .update(dataToSubmit)
+          .eq('id', gasolineData.id);
+
+        if (error) throw error;
+      }
+
+      setSuccess('Gasoline data saved successfully!');
+      setIsNewEntry(true);
+      setGasolineData({
+        user_id: user.id,
+        date: new Date().toISOString().split('T')[0],
+        dollars: null,
+        dollar_gal: null,
+        gallons: 0,
+        CI_kg_gal: null,
+        CO2e_kg: 0
+      });
+    } catch (error) {
+      console.error('Error saving gasoline data:', error);
+      setError('Failed to save gasoline data. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    
+    if (name === 'gallons' || name === 'dollars' || name === 'dollar_gal' || name === 'CI_kg_gal') {
+      const numValue = value === '' ? null : Number(value);
+      setGasolineData(prev => {
+        const updated = {
+          ...prev,
+          [name]: numValue
+        };
+        if (name === 'gallons' || name === 'CI_kg_gal') {
+          updated.CO2e_kg = calculateCO2e(
+            name === 'gallons' ? (numValue || 0) : prev.gallons,
+            name === 'CI_kg_gal' ? numValue : prev.CI_kg_gal
+          );
+        }
+        return updated;
+      });
+    } else {
+      setGasolineData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('gasoline')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      setRawData(prev => prev.filter(entry => entry.id !== id));
+      setMonthlyData(prev => prev.filter(entry => entry.id !== id));
+    } catch (error) {
+      console.error('Error deleting gasoline entry:', error);
+      setError('Failed to delete entry. Please try again.');
+    }
+  };
+
+  const handleEdit = (entry: GasolineData) => {
+    setEditingId(entry.id);
+    setEditForm(entry);
+  };
+
+  const handleEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    if (!editForm) return;
+
+    if (name === 'gallons' || name === 'dollars' || name === 'dollar_gal' || name === 'CI_kg_gal') {
+      const numValue = value === '' ? null : Number(value);
+      setEditForm(prev => {
+        const updated = {
+          ...prev!,
+          [name]: numValue
+        };
+        if (name === 'gallons' || name === 'CI_kg_gal') {
+          updated.CO2e_kg = calculateCO2e(
+            name === 'gallons' ? (numValue || 0) : prev!.gallons,
+            name === 'CI_kg_gal' ? numValue : prev!.CI_kg_gal
+          );
+        }
+        return updated;
+      });
+    } else {
+      setEditForm(prev => ({
+        ...prev!,
+        [name]: value
+      }));
+    }
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !editingId || !editForm) return;
+
+    try {
+      const { error } = await supabase
+        .from('gasoline')
+        .update(editForm)
+        .eq('id', editingId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      setRawData(prev =>
+        prev.map(entry =>
+          entry.id === editingId ? editForm : entry
+        )
+      );
+
+      setMonthlyData(prev =>
+        prev.map(entry =>
+          entry.id === editingId
+            ? {
+                ...entry,
+                CO2e: editForm.CO2e_kg
+              }
+            : entry
+        )
+      );
+
+      setEditingId(null);
+      setEditForm(null);
+    } catch (error) {
+      console.error('Error updating gasoline entry:', error);
+      setError('Failed to update entry. Please try again.');
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  const chartData = {
+    labels: monthlyData.map(d => d.month),
+    datasets: [
+      {
+        label: 'Monthly CO2e (kg)',
+        data: monthlyData.map(d => d.CO2e),
+        borderColor: 'rgb(75, 192, 192)',
+        tension: 0.1
+      }
+    ]
+  };
+
+  const chartOptions = {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: 'top' as const,
+      },
+      title: {
+        display: true,
+        text: 'Monthly Gasoline CO2e Emissions'
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: 'kg CO2e'
+        }
+      },
+      x: {
+        title: {
+          display: true,
+          text: 'Month'
+        }
+      }
+    }
+  };
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-24">
+        <h1 className="text-4xl font-bold mb-8">Please sign in to continue</h1>
+        <Link
+          href="/auth/login"
+          className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+        >
+          Sign In
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <main className="flex min-h-screen flex-col items-center p-24">
+      <div className="w-full max-w-2xl">
+        <div className="flex items-center mb-8">
+          <Link href="/" className="text-indigo-600 hover:text-indigo-800 mr-4">
+            ← Back to Dashboard
+          </Link>
+          <h1 className="text-3xl font-bold">Gasoline Usage</h1>
+        </div>
+
+        {loading ? (
+          <div className="text-lg">Loading...</div>
+        ) : (
+          <>
+            <div className="bg-white p-6 rounded-lg shadow mb-8">
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div>
+                  <label htmlFor="date" className="block text-sm font-medium text-gray-700">
+                    Date
+                  </label>
+                  <input
+                    type="date"
+                    id="date"
+                    name="date"
+                    value={gasolineData.date}
+                    onChange={handleChange}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="gallons" className="block text-sm font-medium text-gray-700">
+                    Gallons
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    id="gallons"
+                    name="gallons"
+                    value={gasolineData.gallons || ''}
+                    onChange={handleChange}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="dollars" className="block text-sm font-medium text-gray-700">
+                    Dollars Spent (Optional)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    id="dollars"
+                    name="dollars"
+                    value={gasolineData.dollars || ''}
+                    onChange={handleChange}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="dollar_gal" className="block text-sm font-medium text-gray-700">
+                    Price per Gallon (Optional)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    id="dollar_gal"
+                    name="dollar_gal"
+                    value={gasolineData.dollar_gal || ''}
+                    onChange={handleChange}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="CI_kg_gal" className="block text-sm font-medium text-gray-700">
+                    Carbon Intensity (kg CO2e/gallon)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    id="CI_kg_gal"
+                    name="CI_kg_gal"
+                    value={gasolineData.CI_kg_gal || ''}
+                    onChange={handleChange}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                  />
+                  <p className="mt-1 text-sm text-gray-500">
+                    Default value: 9.46 kg CO2e/gallon
+                  </p>
+                </div>
+
+                {error && (
+                  <div className="text-red-500 text-sm">{error}</div>
+                )}
+
+                {success && (
+                  <div className="text-green-500 text-sm">
+                    {isNewEntry ? 'New gasoline entry added successfully!' : 'Gasoline data updated successfully!'}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  className="w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                >
+                  {isNewEntry ? 'Add New Gasoline Entry' : 'Update Gasoline Data'}
+                </button>
+              </form>
+            </div>
+
+            {monthlyData.length > 0 && (
+              <div className="bg-white p-6 rounded-lg shadow mb-8">
+                <Line data={chartData} options={chartOptions} />
+              </div>
+            )}
+
+            {rawData.length > 0 && (
+              <div className="bg-white p-6 rounded-lg shadow">
+                <h2 className="text-xl font-bold mb-4">Your Gasoline Data</h2>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gallons</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dollars</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price/Gal</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Carbon Intensity</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CO2e (kg)</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {rawData.map((entry) => (
+                        <tr key={entry.id}>
+                          {editingId === entry.id ? (
+                            <>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <input
+                                  type="date"
+                                  name="date"
+                                  value={editForm?.date}
+                                  onChange={handleEditChange}
+                                  className="border rounded px-2 py-1"
+                                />
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  name="gallons"
+                                  value={editForm?.gallons || ''}
+                                  onChange={handleEditChange}
+                                  className="border rounded px-2 py-1 w-24"
+                                />
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  name="dollars"
+                                  value={editForm?.dollars || ''}
+                                  onChange={handleEditChange}
+                                  className="border rounded px-2 py-1 w-24"
+                                />
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  name="dollar_gal"
+                                  value={editForm?.dollar_gal || ''}
+                                  onChange={handleEditChange}
+                                  className="border rounded px-2 py-1 w-24"
+                                />
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  name="CI_kg_gal"
+                                  value={editForm?.CI_kg_gal || ''}
+                                  onChange={handleEditChange}
+                                  className="border rounded px-2 py-1 w-24"
+                                />
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                {editForm?.CO2e_kg.toFixed(2)}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <button
+                                  onClick={handleEditSubmit}
+                                  className="text-green-600 hover:text-green-900 mr-2"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setEditingId(null);
+                                    setEditForm(null);
+                                  }}
+                                  className="text-gray-600 hover:text-gray-900"
+                                >
+                                  Cancel
+                                </button>
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                {formatDate(entry.date)}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">{entry.gallons}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">{entry.dollars?.toFixed(2) || 'N/A'}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">{entry.dollar_gal?.toFixed(2) || 'N/A'}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">{entry.CI_kg_gal?.toFixed(2) || 'N/A'}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">{entry.CO2e_kg.toFixed(2)}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <button
+                                  onClick={() => handleEdit(entry)}
+                                  className="text-indigo-600 hover:text-indigo-900 mr-2"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(entry.id!)}
+                                  className="text-red-600 hover:text-red-900"
+                                >
+                                  Delete
+                                </button>
+                              </td>
+                            </>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </main>
+  );
+} 
