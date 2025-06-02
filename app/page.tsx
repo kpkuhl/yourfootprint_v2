@@ -103,7 +103,7 @@ export default function Home() {
           footprintData.stuff
         ],
         backgroundColor: [
-          '#FF6384',
+          '#C0C0C0',
           '#36A2EB',
           '#FFCE56',
           '#4BC0C0',
@@ -112,7 +112,7 @@ export default function Home() {
           '#FF6384'
         ],
         borderColor: [
-          '#FF6384',
+          '#C0C0C0',
           '#36A2EB',
           '#FFCE56',
           '#4BC0C0',
