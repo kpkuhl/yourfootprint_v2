@@ -85,7 +85,7 @@ export default function NaturalGasPage() {
   });
   const [inputAmount, setInputAmount] = useState<number>(0);
   const [inputUnit, setInputUnit] = useState<string>('therms');
-  const [inputCI, setInputCI] = useState<string>('');
+  const [inputCI, setInputCI] = useState<string>('5.291');
   const [conversionFactors, setConversionFactors] = useState<ConversionFactor[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -95,7 +95,7 @@ export default function NaturalGasPage() {
   const [rawData, setRawData] = useState<NaturalGasData[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<NaturalGasData | null>(null);
-  const [inputEditCI, setInputEditCI] = useState<string>('');
+  const [inputEditCI, setInputEditCI] = useState<string>('5.291');
 
   // Load saved form data from localStorage
   useEffect(() => {
@@ -325,7 +325,7 @@ export default function NaturalGasPage() {
       });
       setInputAmount(0);
       setInputUnit('therms');
-      setInputCI('');
+      setInputCI('5.291');
       setIsNewEntry(true);
     } catch (error) {
       console.error('Error saving natural gas data:', error);
@@ -440,7 +440,7 @@ export default function NaturalGasPage() {
 
       setEditingId(null);
       setEditForm(null);
-      setInputEditCI('');
+      setInputEditCI('5.291');
       setSuccess('Entry updated successfully!');
     } catch (error) {
       console.error('Error updating entry:', error);
@@ -473,7 +473,7 @@ export default function NaturalGasPage() {
   const handleEdit = (entry: NaturalGasData) => {
     setEditingId(entry.id);
     setEditForm(entry);
-    setInputEditCI(entry.CI_kg_therm?.toString() || '');
+    setInputEditCI(entry.CI_kg_therm?.toString() || '5.291');
   };
 
   const handleEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -614,20 +614,20 @@ export default function NaturalGasPage() {
                 </div>
 
                 <div>
-                  <label htmlFor="CI_kg_therm" className="block text-sm font-medium text-gray-700">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Carbon Intensity (kg CO2e/therm)
                   </label>
                   <input
-                    type="text"
-                    inputMode="decimal"
-                    id="CI_kg_therm"
-                    name="CI_kg_therm"
+                    type="number"
                     value={inputCI}
                     onChange={handleChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className="w-full p-2 border rounded focus:ring-2 focus:ring-indigo-500"
+                    placeholder="5.291 kg CO2e/therm"
+                    min="0"
+                    step="0.01"
                   />
                   <p className="mt-1 text-sm text-gray-500">
-                    Optional: Enter the carbon intensity of your natural gas. If left blank, we'll use the average for your region.
+                    Default value: 5.291 kg CO2e/therm
                   </p>
                 </div>
 
