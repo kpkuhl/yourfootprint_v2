@@ -33,11 +33,14 @@ export default function ElectricityPage() {
 
   // Load saved form data from localStorage
   useEffect(() => {
+    console.log('Component mounted - checking localStorage');
     if (typeof window !== 'undefined') {
       const savedData = localStorage.getItem(STORAGE_KEY);
+      console.log('Retrieved from localStorage:', savedData);
       if (savedData) {
         try {
           const parsedData = JSON.parse(savedData);
+          console.log('Parsed data:', parsedData);
           setElectricityData(parsedData);
         } catch (e) {
           console.error('Error parsing saved form data:', e);
@@ -48,8 +51,13 @@ export default function ElectricityPage() {
 
   // Save form data to localStorage whenever it changes
   useEffect(() => {
-    if (typeof window !== 'undefined' && electricityData.amount !== 0) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(electricityData));
+    console.log('electricityData changed:', electricityData);
+    if (typeof window !== 'undefined') {
+      // Only save if we have meaningful data
+      if (electricityData.amount !== 0 || electricityData.CI_kg_kWh !== null) {
+        console.log('Saving to localStorage:', electricityData);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(electricityData));
+      }
     }
   }, [electricityData]);
 
@@ -58,6 +66,7 @@ export default function ElectricityPage() {
       if (!user) return;
 
       try {
+        console.log('Fetching data from Supabase for user:', user.id);
         const { data, error } = await supabase
           .from('electricity')
           .select('*')
@@ -69,6 +78,7 @@ export default function ElectricityPage() {
         if (error && error.code !== 'PGRST116') throw error; // PGRST116 is "no rows returned" error
         
         if (data) {
+          console.log('Retrieved data from Supabase:', data);
           setElectricityData({
             ...data,
             start_date: new Date(data.start_date).toISOString().split('T')[0],
@@ -76,6 +86,7 @@ export default function ElectricityPage() {
           });
           setIsNewEntry(false);
         } else {
+          console.log('No data found in Supabase, setting defaults');
           // Set default values for new entries
           const today = new Date();
           const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
@@ -104,6 +115,7 @@ export default function ElectricityPage() {
     if (!user) return;
 
     try {
+      console.log('Submitting form data:', electricityData);
       const { error } = await supabase
         .from('electricity')
         .insert({
@@ -127,8 +139,10 @@ export default function ElectricityPage() {
         amount: 0,
         CI_kg_kWh: null
       };
+      console.log('Resetting form with new data:', newData);
       setElectricityData(newData);
       // Clear localStorage after successful submission
+      console.log('Clearing localStorage after submission');
       localStorage.removeItem(STORAGE_KEY);
       setIsNewEntry(true);
     } catch (error) {
@@ -139,6 +153,7 @@ export default function ElectricityPage() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    console.log('Form field changed:', name, value);
     setElectricityData(prev => ({
       ...prev,
       [name]: name === 'amount' || name === 'CI_kg_kWh' ? Number(value) : value
@@ -148,6 +163,7 @@ export default function ElectricityPage() {
   // Clear form data when component unmounts
   useEffect(() => {
     return () => {
+      console.log('Component unmounting - clearing localStorage');
       if (typeof window !== 'undefined') {
         localStorage.removeItem(STORAGE_KEY);
       }
