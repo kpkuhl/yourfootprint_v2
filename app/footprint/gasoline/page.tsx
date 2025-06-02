@@ -369,7 +369,8 @@ export default function GasolinePage() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
+    const date = new Date(dateString);
+    return new Date(date.getTime() + date.getTimezoneOffset() * 60000).toLocaleDateString();
   };
 
   const chartData = {
