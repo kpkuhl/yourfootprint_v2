@@ -52,12 +52,9 @@ export default function ElectricityPage() {
   // Save form data to localStorage whenever it changes
   useEffect(() => {
     console.log('electricityData changed:', electricityData);
-    if (typeof window !== 'undefined') {
-      // Only save if we have meaningful data
-      if (electricityData.amount !== 0 || electricityData.CI_kg_kWh !== null) {
-        console.log('Saving to localStorage:', electricityData);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(electricityData));
-      }
+    if (typeof window !== 'undefined' && electricityData.user_id) {
+      console.log('Saving to localStorage:', electricityData);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(electricityData));
     }
   }, [electricityData]);
 
@@ -65,7 +62,14 @@ export default function ElectricityPage() {
     const fetchData = async () => {
       if (!user) return;
       
-      console.log('Fetching data from Supabase for user:', user.id);
+      // Check localStorage first
+      const savedData = localStorage.getItem(STORAGE_KEY);
+      if (savedData) {
+        console.log('Found data in localStorage, skipping Supabase fetch');
+        return;
+      }
+      
+      console.log('No localStorage data found, fetching from Supabase for user:', user.id);
       const { data, error } = await supabase
         .from('electricity')
         .select('*')
@@ -81,13 +85,20 @@ export default function ElectricityPage() {
 
       console.log('Retrieved data from Supabase:', data);
       
-      // Only update state if there's no data in localStorage
-      const savedData = localStorage.getItem(STORAGE_KEY);
-      if (!savedData) {
-        setElectricityData(data || {
+      if (data) {
+        setElectricityData({
+          ...data,
+          start_date: new Date(data.start_date).toISOString().split('T')[0],
+          end_date: new Date(data.end_date).toISOString().split('T')[0]
+        });
+      } else {
+        // Set default values for new entries
+        const today = new Date();
+        const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        setElectricityData({
           user_id: user.id,
-          start_date: '',
-          end_date: '',
+          start_date: lastMonth.toISOString().split('T')[0],
+          end_date: today.toISOString().split('T')[0],
           amount: 0,
           units: 'kWh',
           CI_kg_kWh: 0.0004
@@ -147,16 +158,6 @@ export default function ElectricityPage() {
       [name]: name === 'amount' || name === 'CI_kg_kWh' ? Number(value) : value
     }));
   };
-
-  // Clear form data when component unmounts
-  useEffect(() => {
-    return () => {
-      console.log('Component unmounting - clearing localStorage');
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem(STORAGE_KEY);
-      }
-    };
-  }, []);
 
   if (!user) {
     return (
