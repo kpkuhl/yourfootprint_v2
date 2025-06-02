@@ -30,9 +30,9 @@ type WaterData = {
   user_id: string;
   start_date: string;
   end_date: string;
-  amount_gallons: number;
-  CI_kg_gallon: number | null;
-  CO2e: number;
+  amount_gal: number;
+  CI_kg_gal: number | null;
+  CO2e_kg: number;
 };
 
 type ConversionFactor = {
@@ -79,9 +79,9 @@ export default function WaterPage() {
     user_id: '',
     start_date: '',
     end_date: '',
-    amount_gallons: 0,
-    CI_kg_gallon: null,
-    CO2e: 0
+    amount_gal: 0,
+    CI_kg_gal: null,
+    CO2e_kg: 0
   });
   const [inputAmount, setInputAmount] = useState<number>(0);
   const [inputUnit, setInputUnit] = useState<string>('gallons');
@@ -105,7 +105,7 @@ export default function WaterPage() {
         try {
           const parsedData = JSON.parse(savedData);
           setWaterData(parsedData);
-          setInputAmount(parsedData.amount_gallons);
+          setInputAmount(parsedData.amount_gal);
           setInputUnit('gallons');
         } catch (e) {
           console.error('Error parsing saved form data:', e);
@@ -164,7 +164,7 @@ export default function WaterPage() {
       
       if (data) {
         setWaterData(data);
-        setInputAmount(data.amount_gallons);
+        setInputAmount(data.amount_gal);
         setInputUnit('gallons');
       } else {
         const today = new Date();
@@ -173,9 +173,9 @@ export default function WaterPage() {
           user_id: user.id,
           start_date: lastMonth.toISOString().split('T')[0],
           end_date: today.toISOString().split('T')[0],
-          amount_gallons: 0,
-          CI_kg_gallon: null,
-          CO2e: 0
+          amount_gal: 0,
+          CI_kg_gal: null,
+          CO2e_kg: 0
         });
       }
     };
@@ -203,7 +203,7 @@ export default function WaterPage() {
       const monthlyValues = data.map(entry => ({
         id: entry.id,
         month: getMajorityMonth(entry.start_date, entry.end_date),
-        CO2e: entry.CO2e
+        CO2e: entry.CO2e_kg
       }));
 
       setMonthlyData(monthlyValues);
@@ -227,9 +227,9 @@ export default function WaterPage() {
     return amount * conversion.factor;
   };
 
-  const calculateCO2e = (amount_gallons: number, CI_kg_gallon: number | null): number => {
+  const calculateCO2e = (amount_gal: number, CI_kg_gal: number | null): number => {
     const defaultCI = 0.0003; // kg CO2e/gallon
-    return amount_gallons * (CI_kg_gallon || defaultCI);
+    return amount_gal * (CI_kg_gal || defaultCI);
   };
 
   const updateHouseholdWater = async () => {
@@ -261,7 +261,7 @@ export default function WaterPage() {
         if (!monthlyTotals[month]) {
           monthlyTotals[month] = { sum: 0, count: 0 };
         }
-        monthlyTotals[month].sum += entry.CO2e;
+        monthlyTotals[month].sum += entry.CO2e_kg;
         monthlyTotals[month].count += 1;
       });
 
@@ -292,9 +292,9 @@ export default function WaterPage() {
     setError(null);
 
     try {
-      const amount_gallons = convertToGallons(inputAmount, inputUnit);
-      const CI_kg_gallon = inputCI === '' ? null : Number(inputCI);
-      const CO2e = calculateCO2e(amount_gallons, CI_kg_gallon);
+      const amount_gal = convertToGallons(inputAmount, inputUnit);
+      const CI_kg_gal = inputCI === '' ? null : Number(inputCI);
+      const CO2e_kg = calculateCO2e(amount_gal, CI_kg_gal);
 
       const { error } = await supabase
         .from('water')
@@ -302,9 +302,9 @@ export default function WaterPage() {
           user_id: user.id,
           start_date: waterData.start_date,
           end_date: waterData.end_date,
-          amount_gallons: Number(amount_gallons),
-          CI_kg_gallon: CI_kg_gallon,
-          CO2e: Number(CO2e)
+          amount_gal: Number(amount_gal),
+          CI_kg_gal: CI_kg_gal,
+          CO2e_kg: Number(CO2e_kg)
         }]);
 
       if (error) throw error;
@@ -319,9 +319,9 @@ export default function WaterPage() {
         user_id: user.id,
         start_date: lastMonth.toISOString().split('T')[0],
         end_date: today.toISOString().split('T')[0],
-        amount_gallons: 0,
-        CI_kg_gallon: null,
-        CO2e: 0
+        amount_gal: 0,
+        CI_kg_gal: null,
+        CO2e_kg: 0
       });
       setInputAmount(0);
       setInputUnit('gallons');
@@ -342,7 +342,7 @@ export default function WaterPage() {
       setInputAmount(value === '' ? 0 : Number(value));
     } else if (name === 'unit') {
       setInputUnit(value);
-    } else if (name === 'CI_kg_gallon') {
+    } else if (name === 'CI_kg_gal') {
       setInputCI(value);
     } else {
       setWaterData(prev => ({
@@ -405,8 +405,8 @@ export default function WaterPage() {
 
       const finalForm = {
         ...editForm,
-        CI_kg_gallon: finalCI,
-        CO2e: calculateCO2e(editForm.amount_gallons, finalCI)
+        CI_kg_gal: finalCI,
+        CO2e_kg: calculateCO2e(editForm.amount_gal, finalCI)
       };
 
       const { error } = await supabase
@@ -414,9 +414,9 @@ export default function WaterPage() {
         .update({
           start_date: finalForm.start_date,
           end_date: finalForm.end_date,
-          amount_gallons: finalForm.amount_gallons,
-          CI_kg_gallon: finalForm.CI_kg_gallon,
-          CO2e: finalForm.CO2e
+          amount_gal: finalForm.amount_gal,
+          CI_kg_gal: finalForm.CI_kg_gal,
+          CO2e_kg: finalForm.CO2e_kg
         })
         .eq('id', editingId)
         .eq('user_id', user.id);
@@ -434,7 +434,7 @@ export default function WaterPage() {
         entry.id === editingId ? {
           id: entry.id,
           month: newMonth,
-          CO2e: finalForm.CO2e
+          CO2e: finalForm.CO2e_kg
         } : entry
       ));
 
@@ -473,14 +473,14 @@ export default function WaterPage() {
   const handleEdit = (entry: WaterData) => {
     setEditingId(entry.id);
     setEditForm(entry);
-    setInputEditCI(entry.CI_kg_gallon?.toString() || '');
+    setInputEditCI(entry.CI_kg_gal?.toString() || '');
   };
 
   const handleEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     if (!editForm) return;
 
-    if (name === 'CI_kg_gallon') {
+    if (name === 'CI_kg_gal') {
       setInputEditCI(value);
       if (value === '' || !isNaN(Number(value))) {
         setEditForm(prev => {
@@ -488,12 +488,12 @@ export default function WaterPage() {
             ...prev!,
             [name]: value === '' ? 0 : Number(value)
           };
-          updated.CO2e = calculateCO2e(updated.amount_gallons, updated.CI_kg_gallon);
+          updated.CO2e_kg = calculateCO2e(updated.amount_gal, updated.CI_kg_gal);
           return updated;
         });
       }
     } else {
-      const newValue = name === 'amount_gallons' || name === 'CO2e' 
+      const newValue = name === 'amount_gal' || name === 'CO2e_kg' 
         ? Number(value) 
         : value;
 
@@ -503,10 +503,10 @@ export default function WaterPage() {
           [name]: newValue
         };
 
-        if (name === 'amount_gallons') {
-          updated.CO2e = calculateCO2e(
+        if (name === 'amount_gal') {
+          updated.CO2e_kg = calculateCO2e(
             newValue as number,
-            updated.CI_kg_gallon
+            updated.CI_kg_gal
           );
         }
 
@@ -614,14 +614,14 @@ export default function WaterPage() {
                 </div>
 
                 <div>
-                  <label htmlFor="CI_kg_gallon" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="CI_kg_gal" className="block text-sm font-medium text-gray-700">
                     Carbon Intensity (kg CO2e/gallon)
                   </label>
                   <input
                     type="text"
                     inputMode="decimal"
-                    id="CI_kg_gallon"
-                    name="CI_kg_gallon"
+                    id="CI_kg_gal"
+                    name="CI_kg_gal"
                     value={inputCI}
                     onChange={handleChange}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -695,8 +695,8 @@ export default function WaterPage() {
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <input
                                   type="text"
-                                  name="amount_gallons"
-                                  value={editForm?.amount_gallons}
+                                  name="amount_gal"
+                                  value={editForm?.amount_gal}
                                   onChange={handleEditChange}
                                   className="border rounded px-2 py-1 w-24"
                                 />
@@ -704,7 +704,7 @@ export default function WaterPage() {
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <input
                                   type="text"
-                                  name="CI_kg_gallon"
+                                  name="CI_kg_gal"
                                   value={inputEditCI}
                                   onChange={handleEditChange}
                                   className="w-full p-2 border rounded"
@@ -714,8 +714,8 @@ export default function WaterPage() {
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <input
                                   type="text"
-                                  name="CO2e"
-                                  value={editForm?.CO2e}
+                                  name="CO2e_kg"
+                                  value={editForm?.CO2e_kg}
                                   onChange={handleEditChange}
                                   className="border rounded px-2 py-1 w-24"
                                 />
@@ -743,9 +743,9 @@ export default function WaterPage() {
                               <td className="px-6 py-4 whitespace-nowrap">
                                 {new Date(entry.start_date).toLocaleDateString()} to {new Date(entry.end_date).toLocaleDateString()}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap">{entry.amount_gallons}</td>
-                              <td className="px-6 py-4 whitespace-nowrap">{entry.CI_kg_gallon || 'N/A'}</td>
-                              <td className="px-6 py-4 whitespace-nowrap">{entry.CO2e}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">{entry.amount_gal}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">{entry.CI_kg_gal || 'N/A'}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">{entry.CO2e_kg}</td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <button
                                   onClick={() => handleEdit(entry)}
