@@ -257,25 +257,42 @@ export default function AirTravelPage() {
       }
 
       const co2e_kg = calculateCO2e(airTravelData.distance, airTravelData.num_travelers, airTravelData.co2e_kg_traveler, airTravelData.co2e_kg_per_trip, airTravelData.direct_co2e_input);
+      
+      // Prepare data for submission
       const dataToSubmit = {
-        ...airTravelData,
         household_id: householdData.id,
-        co2e_kg
+        leave_date: airTravelData.leave_date,
+        return_date: airTravelData.return_date,
+        roundtrip: airTravelData.roundtrip,
+        num_travelers: airTravelData.num_travelers,
+        from: airTravelData.from,
+        to: airTravelData.to,
+        distance: airTravelData.distance,
+        co2e_kg_traveler: airTravelData.co2e_kg_traveler,
+        co2e_kg: co2e_kg
       };
+
+      console.log('Submitting air travel data:', dataToSubmit);
 
       if (isNewEntry) {
         const { error } = await supabase
           .from('air_travel')
           .insert([dataToSubmit]);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error inserting air travel data:', error);
+          throw error;
+        }
       } else {
         const { error } = await supabase
           .from('air_travel')
           .update(dataToSubmit)
           .eq('id', airTravelData.id);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error updating air travel data:', error);
+          throw error;
+        }
       }
 
       await updateHouseholdAirTravel();
@@ -439,16 +456,43 @@ export default function AirTravelPage() {
     if (!user || !editingId || !editForm) return;
 
     try {
+      const co2e_kg = calculateCO2e(
+        editForm.distance,
+        editForm.num_travelers,
+        editForm.co2e_kg_traveler,
+        editForm.co2e_kg_per_trip,
+        editForm.direct_co2e_input
+      );
+
+      // Prepare data for submission
+      const dataToSubmit = {
+        household_id: editForm.household_id,
+        leave_date: editForm.leave_date,
+        return_date: editForm.return_date,
+        roundtrip: editForm.roundtrip,
+        num_travelers: editForm.num_travelers,
+        from: editForm.from,
+        to: editForm.to,
+        distance: editForm.distance,
+        co2e_kg_traveler: editForm.co2e_kg_traveler,
+        co2e_kg: co2e_kg
+      };
+
+      console.log('Updating air travel data:', dataToSubmit);
+
       const { error } = await supabase
         .from('air_travel')
-        .update(editForm)
+        .update(dataToSubmit)
         .eq('id', editingId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating air travel entry:', error);
+        throw error;
+      }
 
       setRawData(prev =>
         prev.map(entry =>
-          entry.id === editingId ? editForm : entry
+          entry.id === editingId ? { ...editForm, co2e_kg } : entry
         )
       );
 
@@ -457,7 +501,7 @@ export default function AirTravelPage() {
           entry.id === editingId
             ? {
                 ...entry,
-                CO2e: editForm.co2e_kg
+                CO2e: co2e_kg
               }
             : entry
         )
