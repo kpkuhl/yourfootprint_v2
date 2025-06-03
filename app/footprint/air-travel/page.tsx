@@ -34,6 +34,7 @@ type AirTravelData = {
   to: string | null;
   distance: number | null;
   co2e_kg_traveler: number | null;
+  co2e_kg_per_trip: number | null;
   co2e_kg: number;
 };
 
@@ -55,6 +56,7 @@ export default function AirTravelPage() {
     to: null,
     distance: null,
     co2e_kg_traveler: null,
+    co2e_kg_per_trip: null,
     co2e_kg: 0
   });
   const [loading, setLoading] = useState(false);
@@ -135,6 +137,7 @@ export default function AirTravelPage() {
             to: null,
             distance: null,
             co2e_kg_traveler: null,
+            co2e_kg_per_trip: null,
             co2e_kg: 0
           });
         }
@@ -212,7 +215,10 @@ export default function AirTravelPage() {
     fetchMonthlyData();
   }, [user]);
 
-  const calculateCO2e = (distance: number | null, num_travelers: number, co2e_kg_traveler: number | null): number => {
+  const calculateCO2e = (distance: number | null, num_travelers: number, co2e_kg_traveler: number | null, co2e_kg_per_trip: number | null): number => {
+    if (co2e_kg_per_trip !== null) {
+      return co2e_kg_per_trip * num_travelers;
+    }
     if (!distance || !co2e_kg_traveler) return 0;
     return distance * num_travelers * co2e_kg_traveler;
   };
@@ -241,7 +247,7 @@ export default function AirTravelPage() {
         throw new Error('No household found for this user');
       }
 
-      const co2e_kg = calculateCO2e(airTravelData.distance, airTravelData.num_travelers, airTravelData.co2e_kg_traveler);
+      const co2e_kg = calculateCO2e(airTravelData.distance, airTravelData.num_travelers, airTravelData.co2e_kg_traveler, airTravelData.co2e_kg_per_trip);
       const dataToSubmit = {
         ...airTravelData,
         household_id: householdData.id,
@@ -275,6 +281,7 @@ export default function AirTravelPage() {
         to: null,
         distance: null,
         co2e_kg_traveler: null,
+        co2e_kg_per_trip: null,
         co2e_kg: 0
       });
     } catch (error) {
@@ -288,7 +295,7 @@ export default function AirTravelPage() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     
-    if (name === 'num_travelers' || name === 'distance' || name === 'co2e_kg_traveler') {
+    if (name === 'num_travelers' || name === 'distance' || name === 'co2e_kg_traveler' || name === 'co2e_kg_per_trip') {
       const numValue = value === '' ? null : Number(value);
       setAirTravelData(prev => {
         const updated = {
@@ -297,8 +304,13 @@ export default function AirTravelPage() {
         };
 
         // Calculate CO2e if we have all required values
-        if (updated.distance && updated.num_travelers && updated.co2e_kg_traveler) {
-          updated.co2e_kg = calculateCO2e(updated.distance, updated.num_travelers, updated.co2e_kg_traveler);
+        if (updated.co2e_kg_per_trip !== null || (updated.distance && updated.num_travelers && updated.co2e_kg_traveler)) {
+          updated.co2e_kg = calculateCO2e(
+            updated.distance,
+            updated.num_travelers,
+            updated.co2e_kg_traveler,
+            updated.co2e_kg_per_trip
+          );
         }
 
         return updated;
@@ -341,7 +353,7 @@ export default function AirTravelPage() {
     const { name, value } = e.target;
     if (!editForm) return;
 
-    if (name === 'num_travelers' || name === 'distance' || name === 'co2e_kg_traveler') {
+    if (name === 'num_travelers' || name === 'distance' || name === 'co2e_kg_traveler' || name === 'co2e_kg_per_trip') {
       const numValue = value === '' ? null : Number(value);
       setEditForm(prev => {
         const updated = {
@@ -350,8 +362,13 @@ export default function AirTravelPage() {
         };
 
         // Calculate CO2e if we have all required values
-        if (updated.distance && updated.num_travelers && updated.co2e_kg_traveler) {
-          updated.co2e_kg = calculateCO2e(updated.distance, updated.num_travelers, updated.co2e_kg_traveler);
+        if (updated.co2e_kg_per_trip !== null || (updated.distance && updated.num_travelers && updated.co2e_kg_traveler)) {
+          updated.co2e_kg = calculateCO2e(
+            updated.distance,
+            updated.num_travelers,
+            updated.co2e_kg_traveler,
+            updated.co2e_kg_per_trip
+          );
         }
 
         return updated;
@@ -619,38 +636,55 @@ export default function AirTravelPage() {
                 </div>
 
                 <div>
-                  <label htmlFor="distance" className="block text-sm font-medium text-gray-700">
-                    Distance (miles)
+                  <label htmlFor="co2e_kg_per_trip" className="block text-sm font-medium text-gray-700">
+                    CO2e per Trip per Traveler (kg)
                   </label>
                   <input
                     type="number"
                     step="0.01"
-                    id="distance"
-                    name="distance"
-                    value={airTravelData.distance || ''}
+                    id="co2e_kg_per_trip"
+                    name="co2e_kg_per_trip"
+                    value={airTravelData.co2e_kg_per_trip || ''}
                     onChange={handleChange}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                    required
+                    placeholder="Leave empty to calculate from distance"
                   />
                 </div>
 
-                <div>
-                  <label htmlFor="co2e_kg_traveler" className="block text-sm font-medium text-gray-700">
-                    CO2e per Traveler per Mile (kg)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.0001"
-                    id="co2e_kg_traveler"
-                    name="co2e_kg_traveler"
-                    value={airTravelData.co2e_kg_traveler || ''}
-                    onChange={handleChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                    required
-                  />
-                  <p className="mt-1 text-sm text-gray-500">
-                    Default value: 0.0002 kg CO2e per mile per traveler
-                  </p>
+                <div className="border-t pt-4">
+                  <p className="text-sm text-gray-500 mb-4">Or calculate from distance:</p>
+                  <div>
+                    <label htmlFor="distance" className="block text-sm font-medium text-gray-700">
+                      Distance (miles)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      id="distance"
+                      name="distance"
+                      value={airTravelData.distance || ''}
+                      onChange={handleChange}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div className="mt-4">
+                    <label htmlFor="co2e_kg_traveler" className="block text-sm font-medium text-gray-700">
+                      CO2e per Traveler per Mile (kg)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.0001"
+                      id="co2e_kg_traveler"
+                      name="co2e_kg_traveler"
+                      value={airTravelData.co2e_kg_traveler || ''}
+                      onChange={handleChange}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    />
+                    <p className="mt-1 text-sm text-gray-500">
+                      Default value: 0.0002 kg CO2e per mile per traveler
+                    </p>
+                  </div>
                 </div>
 
                 {error && (
@@ -689,8 +723,7 @@ export default function AirTravelPage() {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Travelers</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">From</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">To</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Distance</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CO2e/Mile</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CO2e/Trip</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CO2e (kg)</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                       </tr>
@@ -741,18 +774,8 @@ export default function AirTravelPage() {
                                 <input
                                   type="number"
                                   step="0.01"
-                                  name="distance"
-                                  value={editForm?.distance || ''}
-                                  onChange={handleEditChange}
-                                  className="border rounded px-2 py-1 w-24"
-                                />
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <input
-                                  type="number"
-                                  step="0.0001"
-                                  name="co2e_kg_traveler"
-                                  value={editForm?.co2e_kg_traveler || ''}
+                                  name="co2e_kg_per_trip"
+                                  value={editForm?.co2e_kg_per_trip || ''}
                                   onChange={handleEditChange}
                                   className="border rounded px-2 py-1 w-24"
                                 />
@@ -786,8 +809,7 @@ export default function AirTravelPage() {
                               <td className="px-6 py-4 whitespace-nowrap">{entry.num_travelers}</td>
                               <td className="px-6 py-4 whitespace-nowrap">{entry.from || 'N/A'}</td>
                               <td className="px-6 py-4 whitespace-nowrap">{entry.to || 'N/A'}</td>
-                              <td className="px-6 py-4 whitespace-nowrap">{entry.distance?.toFixed(2) || 'N/A'}</td>
-                              <td className="px-6 py-4 whitespace-nowrap">{entry.co2e_kg_traveler?.toFixed(4) || 'N/A'}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">{entry.co2e_kg_per_trip?.toFixed(2) || 'N/A'}</td>
                               <td className="px-6 py-4 whitespace-nowrap">{entry.co2e_kg.toFixed(2)}</td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <button
