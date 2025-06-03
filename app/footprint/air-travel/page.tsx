@@ -122,7 +122,7 @@ export default function AirTravelPage() {
           .from('air_travel')
           .select('*')
           .eq('household_id', householdData.id)
-          .order('date', { ascending: false })
+          .order('leave_date', { ascending: false })
           .limit(1)
           .single();
 
@@ -178,7 +178,7 @@ export default function AirTravelPage() {
         .from('air_travel')
         .select('*')
         .eq('household_id', householdData.id)
-        .order('date', { ascending: true });
+        .order('leave_date', { ascending: true });
 
       if (error) {
         console.error('Error fetching air travel data:', error);
@@ -188,7 +188,7 @@ export default function AirTravelPage() {
       setRawData(data || []);
 
       // Get the date range
-      const dates = data.map(entry => new Date(entry.date));
+      const dates = data.map(entry => new Date(entry.leave_date));
       const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
       const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
 
@@ -203,7 +203,7 @@ export default function AirTravelPage() {
 
       // Sum up emissions for each month
       data.forEach(entry => {
-        const monthKey = new Date(entry.date).toLocaleString('default', { month: 'long', year: 'numeric' });
+        const monthKey = new Date(entry.leave_date).toLocaleString('default', { month: 'long', year: 'numeric' });
         const monthData = monthlyMap.get(monthKey);
         if (monthData) {
           monthData.sum += entry.co2e_kg;
@@ -501,8 +501,8 @@ export default function AirTravelPage() {
         .from('air_travel')
         .select('*')
         .eq('household_id', householdData.id)
-        .gte('date', cutoffDate)
-        .order('date', { ascending: true });
+        .gte('leave_date', cutoffDate)
+        .order('leave_date', { ascending: true });
 
       if (fetchError) {
         console.error('Error fetching air travel data:', fetchError);
@@ -519,7 +519,7 @@ export default function AirTravelPage() {
       const monthlyTotals: { [key: string]: { sum: number; count: number } } = {};
       
       recentData.forEach(entry => {
-        const month = new Date(entry.date).toLocaleString('default', { month: 'long', year: 'numeric' });
+        const month = new Date(entry.leave_date).toLocaleString('default', { month: 'long', year: 'numeric' });
         if (!monthlyTotals[month]) {
           monthlyTotals[month] = { sum: 0, count: 0 };
         }
