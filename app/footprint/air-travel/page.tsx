@@ -37,6 +37,8 @@ type AirTravelData = {
   distance: number | null;
   co2e_kg_traveler: number | null;
   co2e_kg: number;
+  direct_co2e_input: boolean;
+  co2e_kg_per_trip: number | null;
 };
 
 type MonthlyData = {
@@ -59,7 +61,9 @@ export default function AirTravelPage() {
     to: null,
     distance: null,
     co2e_kg_traveler: null,
-    co2e_kg: 0
+    co2e_kg: 0,
+    direct_co2e_input: false,
+    co2e_kg_per_trip: null
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -141,7 +145,9 @@ export default function AirTravelPage() {
             to: null,
             distance: null,
             co2e_kg_traveler: null,
-            co2e_kg: 0
+            co2e_kg: 0,
+            direct_co2e_input: false,
+            co2e_kg_per_trip: null
           });
         }
       }
@@ -218,7 +224,10 @@ export default function AirTravelPage() {
     fetchMonthlyData();
   }, [user]);
 
-  const calculateCO2e = (distance: number | null, num_travelers: number, co2e_kg_traveler: number | null): number => {
+  const calculateCO2e = (distance: number | null, num_travelers: number, co2e_kg_traveler: number | null, co2e_kg_per_trip: number | null, direct_co2e_input: boolean): number => {
+    if (direct_co2e_input && co2e_kg_per_trip) {
+      return co2e_kg_per_trip * num_travelers;
+    }
     if (!distance || !co2e_kg_traveler) return 0;
     return distance * num_travelers * co2e_kg_traveler;
   };
@@ -247,7 +256,7 @@ export default function AirTravelPage() {
         throw new Error('No household found for this user');
       }
 
-      const co2e_kg = calculateCO2e(airTravelData.distance, airTravelData.num_travelers, airTravelData.co2e_kg_traveler);
+      const co2e_kg = calculateCO2e(airTravelData.distance, airTravelData.num_travelers, airTravelData.co2e_kg_traveler, airTravelData.co2e_kg_per_trip, airTravelData.direct_co2e_input);
       const dataToSubmit = {
         ...airTravelData,
         household_id: householdData.id,
@@ -283,7 +292,9 @@ export default function AirTravelPage() {
         to: null,
         distance: null,
         co2e_kg_traveler: null,
-        co2e_kg: 0
+        co2e_kg: 0,
+        direct_co2e_input: false,
+        co2e_kg_per_trip: null
       });
     } catch (error) {
       console.error('Error saving air travel data:', error);
@@ -297,12 +308,21 @@ export default function AirTravelPage() {
     const { name, value, type, checked } = e.target;
     
     if (type === 'checkbox') {
-      setAirTravelData(prev => ({
-        ...prev,
-        [name]: checked,
-        return_date: checked ? prev.leave_date : null
-      }));
-    } else if (name === 'num_travelers' || name === 'distance' || name === 'co2e_kg_traveler') {
+      if (name === 'roundtrip') {
+        setAirTravelData(prev => ({
+          ...prev,
+          [name]: checked,
+          return_date: checked ? prev.leave_date : null
+        }));
+      } else if (name === 'direct_co2e_input') {
+        setAirTravelData(prev => ({
+          ...prev,
+          [name]: checked,
+          co2e_kg_traveler: checked ? null : 0.0002,
+          co2e_kg_per_trip: checked ? null : null
+        }));
+      }
+    } else if (name === 'num_travelers' || name === 'distance' || name === 'co2e_kg_traveler' || name === 'co2e_kg_per_trip') {
       const numValue = value === '' ? null : Number(value);
       setAirTravelData(prev => {
         const updated = {
@@ -310,13 +330,27 @@ export default function AirTravelPage() {
           [name]: numValue
         };
 
-        // Calculate CO2e if we have all required values
-        if (updated.distance && updated.num_travelers && updated.co2e_kg_traveler) {
-          updated.co2e_kg = calculateCO2e(
-            updated.distance,
-            updated.num_travelers,
-            updated.co2e_kg_traveler
-          );
+        // Calculate CO2e based on the input method
+        if (updated.direct_co2e_input) {
+          if (updated.co2e_kg_per_trip && updated.num_travelers) {
+            updated.co2e_kg = calculateCO2e(
+              updated.distance,
+              updated.num_travelers,
+              updated.co2e_kg_traveler,
+              updated.co2e_kg_per_trip,
+              true
+            );
+          }
+        } else {
+          if (updated.distance && updated.num_travelers && updated.co2e_kg_traveler) {
+            updated.co2e_kg = calculateCO2e(
+              updated.distance,
+              updated.num_travelers,
+              updated.co2e_kg_traveler,
+              updated.co2e_kg_per_trip,
+              false
+            );
+          }
         }
 
         return updated;
@@ -359,7 +393,7 @@ export default function AirTravelPage() {
     const { name, value } = e.target;
     if (!editForm) return;
 
-    if (name === 'num_travelers' || name === 'distance' || name === 'co2e_kg_traveler') {
+    if (name === 'num_travelers' || name === 'distance' || name === 'co2e_kg_traveler' || name === 'co2e_kg_per_trip') {
       const numValue = value === '' ? null : Number(value);
       setEditForm(prev => {
         const updated = {
@@ -367,13 +401,27 @@ export default function AirTravelPage() {
           [name]: numValue
         };
 
-        // Calculate CO2e if we have all required values
-        if (updated.distance && updated.num_travelers && updated.co2e_kg_traveler) {
-          updated.co2e_kg = calculateCO2e(
-            updated.distance,
-            updated.num_travelers,
-            updated.co2e_kg_traveler
-          );
+        // Calculate CO2e based on the input method
+        if (updated.direct_co2e_input) {
+          if (updated.co2e_kg_per_trip && updated.num_travelers) {
+            updated.co2e_kg = calculateCO2e(
+              updated.distance,
+              updated.num_travelers,
+              updated.co2e_kg_traveler,
+              updated.co2e_kg_per_trip,
+              true
+            );
+          }
+        } else {
+          if (updated.distance && updated.num_travelers && updated.co2e_kg_traveler) {
+            updated.co2e_kg = calculateCO2e(
+              updated.distance,
+              updated.num_travelers,
+              updated.co2e_kg_traveler,
+              updated.co2e_kg_per_trip,
+              false
+            );
+          }
         }
 
         return updated;
@@ -593,6 +641,20 @@ export default function AirTravelPage() {
                   </label>
                 </div>
 
+                <div className="flex items-center mb-4">
+                  <input
+                    type="checkbox"
+                    id="direct_co2e_input"
+                    name="direct_co2e_input"
+                    checked={airTravelData.direct_co2e_input}
+                    onChange={handleChange}
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="direct_co2e_input" className="ml-2 block text-sm text-gray-900">
+                    Enter CO2e directly per trip
+                  </label>
+                </div>
+
                 <div>
                   <label htmlFor="leave_date" className="block text-sm font-medium text-gray-700">
                     Leave Date
@@ -672,40 +734,60 @@ export default function AirTravelPage() {
                   />
                 </div>
 
-                <div>
-                  <label htmlFor="distance" className="block text-sm font-medium text-gray-700">
-                    Distance (miles)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    id="distance"
-                    name="distance"
-                    value={airTravelData.distance || ''}
-                    onChange={handleChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                    required
-                  />
-                </div>
+                {airTravelData.direct_co2e_input ? (
+                  <div>
+                    <label htmlFor="co2e_kg_per_trip" className="block text-sm font-medium text-gray-700">
+                      CO2e per Trip per Traveler (kg)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      id="co2e_kg_per_trip"
+                      name="co2e_kg_per_trip"
+                      value={airTravelData.co2e_kg_per_trip || ''}
+                      onChange={handleChange}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      required
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <label htmlFor="distance" className="block text-sm font-medium text-gray-700">
+                        Distance (miles)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        id="distance"
+                        name="distance"
+                        value={airTravelData.distance || ''}
+                        onChange={handleChange}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        required
+                      />
+                    </div>
 
-                <div className="mt-4">
-                  <label htmlFor="co2e_kg_traveler" className="block text-sm font-medium text-gray-700">
-                    CO2e per Traveler per Mile (kg)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.0001"
-                    id="co2e_kg_traveler"
-                    name="co2e_kg_traveler"
-                    value={airTravelData.co2e_kg_traveler || ''}
-                    onChange={handleChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                    required
-                  />
-                  <p className="mt-1 text-sm text-gray-500">
-                    Default value: 0.0002 kg CO2e per mile per traveler
-                  </p>
-                </div>
+                    <div>
+                      <label htmlFor="co2e_kg_traveler" className="block text-sm font-medium text-gray-700">
+                        CO2e per Traveler per Mile (kg)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.0001"
+                        id="co2e_kg_traveler"
+                        name="co2e_kg_traveler"
+                        value={airTravelData.co2e_kg_traveler || ''}
+                        onChange={handleChange}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        required
+                      />
+                      <p className="mt-1 text-sm text-gray-500">
+                        Default value: 0.0002 kg CO2e per mile per traveler
+                      </p>
+                    </div>
+                  </>
+                )}
 
                 {error && (
                   <div className="text-red-500 text-sm">{error}</div>
