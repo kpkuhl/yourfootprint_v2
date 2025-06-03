@@ -1,0 +1,820 @@
+'use client';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../../utils/supabase';
+import Link from 'next/link';
+import { Line } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+} from 'chart.js';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+);
+
+type AirTravelData = {
+  id?: string;
+  household_id: string;
+  date: string;
+  num_travelers: number;
+  from: string | null;
+  to: string | null;
+  distance: number | null;
+  co2e_kg_traveler: number | null;
+  co2e_kg: number;
+};
+
+type MonthlyData = {
+  id: string;
+  month: string;
+  CO2e: number;
+};
+
+const STORAGE_KEY = 'airTravelFormData';
+
+export default function AirTravelPage() {
+  const { user } = useAuth();
+  const [airTravelData, setAirTravelData] = useState<AirTravelData>({
+    household_id: '',
+    date: '',
+    num_travelers: 1,
+    from: null,
+    to: null,
+    distance: null,
+    co2e_kg_traveler: null,
+    co2e_kg: 0
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [isNewEntry, setIsNewEntry] = useState(true);
+  const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
+  const [rawData, setRawData] = useState<AirTravelData[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<AirTravelData | null>(null);
+
+  // Load saved form data from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedData = localStorage.getItem(STORAGE_KEY);
+      if (savedData) {
+        try {
+          const parsedData = JSON.parse(savedData);
+          setAirTravelData(parsedData);
+        } catch (e) {
+          console.error('Error parsing saved form data:', e);
+        }
+      }
+    }
+  }, []);
+
+  // Save form data to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined' && airTravelData.household_id) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(airTravelData));
+    }
+  }, [airTravelData]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!user) return;
+      
+      const savedData = localStorage.getItem(STORAGE_KEY);
+      if (savedData) {
+        return;
+      }
+      
+      // First get the household_id
+      const { data: householdData, error: householdError } = await supabase
+        .from('households')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (householdError) {
+        console.error('Error fetching household data:', householdError);
+        return;
+      }
+
+      if (householdData) {
+        const { data, error } = await supabase
+          .from('air_travel')
+          .select('*')
+          .eq('household_id', householdData.id)
+          .order('date', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
+          console.error('Error fetching data:', error);
+          return;
+        }
+        
+        if (data) {
+          setAirTravelData(data);
+        } else {
+          const today = new Date();
+          setAirTravelData({
+            household_id: householdData.id,
+            date: today.toISOString().split('T')[0],
+            num_travelers: 1,
+            from: null,
+            to: null,
+            distance: null,
+            co2e_kg_traveler: null,
+            co2e_kg: 0
+          });
+        }
+      }
+    };
+
+    fetchData();
+  }, [user]);
+
+  useEffect(() => {
+    const fetchMonthlyData = async () => {
+      if (!user) return;
+
+      // First get the household_id
+      const { data: householdData, error: householdError } = await supabase
+        .from('households')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (householdError) {
+        console.error('Error fetching household data:', householdError);
+        return;
+      }
+
+      if (!householdData) return;
+
+      const { data, error } = await supabase
+        .from('air_travel')
+        .select('*')
+        .eq('household_id', householdData.id)
+        .order('date', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching air travel data:', error);
+        return;
+      }
+
+      setRawData(data || []);
+
+      // Get the date range
+      const dates = data.map(entry => new Date(entry.date));
+      const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
+      const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+
+      // Create a map of all months in the range
+      const monthlyMap = new Map<string, { sum: number; count: number }>();
+      const currentDate = new Date(minDate);
+      while (currentDate <= maxDate) {
+        const monthKey = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+        monthlyMap.set(monthKey, { sum: 0, count: 0 });
+        currentDate.setMonth(currentDate.getMonth() + 1);
+      }
+
+      // Sum up emissions for each month
+      data.forEach(entry => {
+        const monthKey = new Date(entry.date).toLocaleString('default', { month: 'long', year: 'numeric' });
+        const monthData = monthlyMap.get(monthKey);
+        if (monthData) {
+          monthData.sum += entry.co2e_kg;
+          monthData.count += 1;
+        }
+      });
+
+      // Convert to array and calculate averages
+      const monthlyValues = Array.from(monthlyMap.entries()).map(([month, data]) => ({
+        id: month,
+        month,
+        CO2e: data.sum
+      }));
+
+      setMonthlyData(monthlyValues);
+    };
+
+    fetchMonthlyData();
+  }, [user]);
+
+  const calculateCO2e = (distance: number | null, num_travelers: number, co2e_kg_traveler: number | null): number => {
+    if (!distance || !co2e_kg_traveler) return 0;
+    return distance * num_travelers * co2e_kg_traveler;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      // First get the household_id
+      const { data: householdData, error: householdError } = await supabase
+        .from('households')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (householdError) {
+        throw new Error('Error fetching household data');
+      }
+
+      if (!householdData) {
+        throw new Error('No household found for this user');
+      }
+
+      const co2e_kg = calculateCO2e(airTravelData.distance, airTravelData.num_travelers, airTravelData.co2e_kg_traveler);
+      const dataToSubmit = {
+        ...airTravelData,
+        household_id: householdData.id,
+        co2e_kg
+      };
+
+      if (isNewEntry) {
+        const { error } = await supabase
+          .from('air_travel')
+          .insert([dataToSubmit]);
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('air_travel')
+          .update(dataToSubmit)
+          .eq('id', airTravelData.id);
+
+        if (error) throw error;
+      }
+
+      await updateHouseholdAirTravel();
+
+      setSuccess('Air travel data saved successfully!');
+      setIsNewEntry(true);
+      setAirTravelData({
+        household_id: householdData.id,
+        date: new Date().toISOString().split('T')[0],
+        num_travelers: 1,
+        from: null,
+        to: null,
+        distance: null,
+        co2e_kg_traveler: null,
+        co2e_kg: 0
+      });
+    } catch (error) {
+      console.error('Error saving air travel data:', error);
+      setError(error instanceof Error ? error.message : 'Failed to save air travel data. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    
+    if (name === 'num_travelers' || name === 'distance' || name === 'co2e_kg_traveler') {
+      const numValue = value === '' ? null : Number(value);
+      setAirTravelData(prev => {
+        const updated = {
+          ...prev,
+          [name]: numValue
+        };
+
+        // Calculate CO2e if we have all required values
+        if (updated.distance && updated.num_travelers && updated.co2e_kg_traveler) {
+          updated.co2e_kg = calculateCO2e(updated.distance, updated.num_travelers, updated.co2e_kg_traveler);
+        }
+
+        return updated;
+      });
+    } else {
+      setAirTravelData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('air_travel')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setRawData(prev => prev.filter(entry => entry.id !== id));
+      setMonthlyData(prev => prev.filter(entry => entry.id !== id));
+      
+      await updateHouseholdAirTravel();
+    } catch (error) {
+      console.error('Error deleting air travel entry:', error);
+      setError('Failed to delete entry. Please try again.');
+    }
+  };
+
+  const handleEdit = (entry: AirTravelData) => {
+    setEditingId(entry.id);
+    setEditForm(entry);
+  };
+
+  const handleEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    if (!editForm) return;
+
+    if (name === 'num_travelers' || name === 'distance' || name === 'co2e_kg_traveler') {
+      const numValue = value === '' ? null : Number(value);
+      setEditForm(prev => {
+        const updated = {
+          ...prev!,
+          [name]: numValue
+        };
+
+        // Calculate CO2e if we have all required values
+        if (updated.distance && updated.num_travelers && updated.co2e_kg_traveler) {
+          updated.co2e_kg = calculateCO2e(updated.distance, updated.num_travelers, updated.co2e_kg_traveler);
+        }
+
+        return updated;
+      });
+    } else {
+      setEditForm(prev => ({
+        ...prev!,
+        [name]: value
+      }));
+    }
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !editingId || !editForm) return;
+
+    try {
+      const { error } = await supabase
+        .from('air_travel')
+        .update(editForm)
+        .eq('id', editingId);
+
+      if (error) throw error;
+
+      setRawData(prev =>
+        prev.map(entry =>
+          entry.id === editingId ? editForm : entry
+        )
+      );
+
+      setMonthlyData(prev =>
+        prev.map(entry =>
+          entry.id === editingId
+            ? {
+                ...entry,
+                CO2e: editForm.co2e_kg
+              }
+            : entry
+        )
+      );
+
+      await updateHouseholdAirTravel();
+
+      setEditingId(null);
+      setEditForm(null);
+    } catch (error) {
+      console.error('Error updating air travel entry:', error);
+      setError('Failed to update entry. Please try again.');
+    }
+  };
+
+  const updateHouseholdAirTravel = async () => {
+    if (!user) return;
+
+    try {
+      // First get the household_id
+      const { data: householdData, error: householdError } = await supabase
+        .from('households')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (householdError) {
+        console.error('Error fetching household data:', householdError);
+        return;
+      }
+
+      if (!householdData) return;
+
+      const twelveMonthsAgo = new Date();
+      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+      const cutoffDate = twelveMonthsAgo.toISOString().split('T')[0];
+
+      console.log('Fetching air travel data since:', cutoffDate);
+
+      const { data: recentData, error: fetchError } = await supabase
+        .from('air_travel')
+        .select('*')
+        .eq('household_id', householdData.id)
+        .gte('date', cutoffDate)
+        .order('date', { ascending: true });
+
+      if (fetchError) {
+        console.error('Error fetching air travel data:', fetchError);
+        throw fetchError;
+      }
+
+      if (!recentData || recentData.length === 0) {
+        console.log('No air travel data found for the last 12 months');
+        return;
+      }
+
+      console.log('Found air travel data entries:', recentData.length);
+
+      const monthlyTotals: { [key: string]: { sum: number; count: number } } = {};
+      
+      recentData.forEach(entry => {
+        const month = new Date(entry.date).toLocaleString('default', { month: 'long', year: 'numeric' });
+        if (!monthlyTotals[month]) {
+          monthlyTotals[month] = { sum: 0, count: 0 };
+        }
+        monthlyTotals[month].sum += entry.co2e_kg;
+        monthlyTotals[month].count += 1;
+      });
+
+      console.log('Monthly totals:', monthlyTotals);
+
+      const monthlyAverages = Object.values(monthlyTotals).map(
+        ({ sum, count }) => sum / count
+      );
+      const overallAverage = monthlyAverages.reduce((a, b) => a + b, 0) / monthlyAverages.length;
+
+      console.log('Calculated overall average:', overallAverage);
+
+      const { error: updateError } = await supabase
+        .from('households')
+        .update({ air_travel: overallAverage })
+        .eq('id', householdData.id);
+
+      if (updateError) {
+        console.error('Error updating household record:', updateError);
+        throw updateError;
+      }
+
+      console.log('Successfully updated household air travel value:', overallAverage);
+    } catch (error) {
+      console.error('Error in updateHouseholdAirTravel:', error);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return new Date(date.getTime() + date.getTimezoneOffset() * 60000).toLocaleDateString();
+  };
+
+  const chartData = {
+    labels: monthlyData.map(d => d.month),
+    datasets: [
+      {
+        label: 'Monthly CO2e (kg)',
+        data: monthlyData.map(d => d.CO2e),
+        borderColor: 'rgb(75, 192, 192)',
+        tension: 0.1
+      }
+    ]
+  };
+
+  const chartOptions = {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: 'top' as const,
+      },
+      title: {
+        display: true,
+        text: 'Monthly Air Travel CO2e Emissions'
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: 'kg CO2e'
+        }
+      },
+      x: {
+        title: {
+          display: true,
+          text: 'Month'
+        }
+      }
+    }
+  };
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-24">
+        <h1 className="text-4xl font-bold mb-8">Please sign in to continue</h1>
+        <Link
+          href="/auth/login"
+          className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+        >
+          Sign In
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <main className="flex min-h-screen flex-col items-center p-24">
+      <div className="w-full max-w-2xl">
+        <div className="flex items-center mb-8">
+          <Link href="/" className="text-indigo-600 hover:text-indigo-800 mr-4">
+            ← Back to Dashboard
+          </Link>
+          <h1 className="text-3xl font-bold">Air Travel</h1>
+        </div>
+
+        {loading ? (
+          <div className="text-lg">Loading...</div>
+        ) : (
+          <>
+            <div className="bg-white p-6 rounded-lg shadow mb-8">
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div>
+                  <label htmlFor="date" className="block text-sm font-medium text-gray-700">
+                    Date
+                  </label>
+                  <input
+                    type="date"
+                    id="date"
+                    name="date"
+                    value={airTravelData.date}
+                    onChange={handleChange}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="num_travelers" className="block text-sm font-medium text-gray-700">
+                    Number of Travelers
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    id="num_travelers"
+                    name="num_travelers"
+                    value={airTravelData.num_travelers}
+                    onChange={handleChange}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="from" className="block text-sm font-medium text-gray-700">
+                    From (Airport Code)
+                  </label>
+                  <input
+                    type="text"
+                    id="from"
+                    name="from"
+                    value={airTravelData.from || ''}
+                    onChange={handleChange}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    placeholder="e.g., SFO"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="to" className="block text-sm font-medium text-gray-700">
+                    To (Airport Code)
+                  </label>
+                  <input
+                    type="text"
+                    id="to"
+                    name="to"
+                    value={airTravelData.to || ''}
+                    onChange={handleChange}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    placeholder="e.g., JFK"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="distance" className="block text-sm font-medium text-gray-700">
+                    Distance (miles)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    id="distance"
+                    name="distance"
+                    value={airTravelData.distance || ''}
+                    onChange={handleChange}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="co2e_kg_traveler" className="block text-sm font-medium text-gray-700">
+                    CO2e per Traveler per Mile (kg)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.0001"
+                    id="co2e_kg_traveler"
+                    name="co2e_kg_traveler"
+                    value={airTravelData.co2e_kg_traveler || ''}
+                    onChange={handleChange}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    required
+                  />
+                  <p className="mt-1 text-sm text-gray-500">
+                    Default value: 0.0002 kg CO2e per mile per traveler
+                  </p>
+                </div>
+
+                {error && (
+                  <div className="text-red-500 text-sm">{error}</div>
+                )}
+
+                {success && (
+                  <div className="text-green-500 text-sm">
+                    {isNewEntry ? 'New air travel entry added successfully!' : 'Air travel data updated successfully!'}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  className="w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                >
+                  {isNewEntry ? 'Add New Air Travel Entry' : 'Update Air Travel Data'}
+                </button>
+              </form>
+            </div>
+
+            {monthlyData.length > 0 && (
+              <div className="bg-white p-6 rounded-lg shadow mb-8">
+                <Line data={chartData} options={chartOptions} />
+              </div>
+            )}
+
+            {rawData.length > 0 && (
+              <div className="bg-white p-6 rounded-lg shadow">
+                <h2 className="text-xl font-bold mb-4">Your Air Travel Data</h2>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Travelers</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">From</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">To</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Distance</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CO2e/Mile</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CO2e (kg)</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {rawData.map((entry) => (
+                        <tr key={entry.id}>
+                          {editingId === entry.id ? (
+                            <>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <input
+                                  type="date"
+                                  name="date"
+                                  value={editForm?.date}
+                                  onChange={handleEditChange}
+                                  className="border rounded px-2 py-1"
+                                />
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <input
+                                  type="number"
+                                  min="1"
+                                  name="num_travelers"
+                                  value={editForm?.num_travelers || ''}
+                                  onChange={handleEditChange}
+                                  className="border rounded px-2 py-1 w-24"
+                                />
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <input
+                                  type="text"
+                                  name="from"
+                                  value={editForm?.from || ''}
+                                  onChange={handleEditChange}
+                                  className="border rounded px-2 py-1 w-24"
+                                />
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <input
+                                  type="text"
+                                  name="to"
+                                  value={editForm?.to || ''}
+                                  onChange={handleEditChange}
+                                  className="border rounded px-2 py-1 w-24"
+                                />
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  name="distance"
+                                  value={editForm?.distance || ''}
+                                  onChange={handleEditChange}
+                                  className="border rounded px-2 py-1 w-24"
+                                />
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <input
+                                  type="number"
+                                  step="0.0001"
+                                  name="co2e_kg_traveler"
+                                  value={editForm?.co2e_kg_traveler || ''}
+                                  onChange={handleEditChange}
+                                  className="border rounded px-2 py-1 w-24"
+                                />
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                {editForm?.co2e_kg.toFixed(2)}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <button
+                                  onClick={handleEditSubmit}
+                                  className="text-green-600 hover:text-green-900 mr-2"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setEditingId(null);
+                                    setEditForm(null);
+                                  }}
+                                  className="text-gray-600 hover:text-gray-900"
+                                >
+                                  Cancel
+                                </button>
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                {formatDate(entry.date)}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">{entry.num_travelers}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">{entry.from || 'N/A'}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">{entry.to || 'N/A'}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">{entry.distance?.toFixed(2) || 'N/A'}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">{entry.co2e_kg_traveler?.toFixed(4) || 'N/A'}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">{entry.co2e_kg.toFixed(2)}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <button
+                                  onClick={() => handleEdit(entry)}
+                                  className="text-indigo-600 hover:text-indigo-900 mr-2"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(entry.id!)}
+                                  className="text-red-600 hover:text-red-900"
+                                >
+                                  Delete
+                                </button>
+                              </td>
+                            </>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </main>
+  );
+} 
