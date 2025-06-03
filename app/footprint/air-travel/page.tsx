@@ -28,7 +28,9 @@ ChartJS.register(
 type AirTravelData = {
   id?: string;
   household_id: string;
-  date: string;
+  leave_date: string;
+  return_date: string | null;
+  roundtrip: boolean;
   num_travelers: number;
   from: string | null;
   to: string | null;
@@ -50,7 +52,9 @@ export default function AirTravelPage() {
   const { user } = useAuth();
   const [airTravelData, setAirTravelData] = useState<AirTravelData>({
     household_id: '',
-    date: '',
+    leave_date: '',
+    return_date: null,
+    roundtrip: false,
     num_travelers: 1,
     from: null,
     to: null,
@@ -131,7 +135,9 @@ export default function AirTravelPage() {
           const today = new Date();
           setAirTravelData({
             household_id: householdData.id,
-            date: today.toISOString().split('T')[0],
+            leave_date: today.toISOString().split('T')[0],
+            return_date: null,
+            roundtrip: false,
             num_travelers: 1,
             from: null,
             to: null,
@@ -275,7 +281,9 @@ export default function AirTravelPage() {
       setIsNewEntry(true);
       setAirTravelData({
         household_id: householdData.id,
-        date: new Date().toISOString().split('T')[0],
+        leave_date: new Date().toISOString().split('T')[0],
+        return_date: null,
+        roundtrip: false,
         num_travelers: 1,
         from: null,
         to: null,
@@ -293,9 +301,15 @@ export default function AirTravelPage() {
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     
-    if (name === 'num_travelers' || name === 'distance' || name === 'co2e_kg_traveler' || name === 'co2e_kg_per_trip') {
+    if (type === 'checkbox') {
+      setAirTravelData(prev => ({
+        ...prev,
+        [name]: checked,
+        return_date: checked ? prev.leave_date : null
+      }));
+    } else if (name === 'num_travelers' || name === 'distance' || name === 'co2e_kg_traveler' || name === 'co2e_kg_per_trip') {
       const numValue = value === '' ? null : Number(value);
       setAirTravelData(prev => {
         const updated = {
@@ -574,20 +588,52 @@ export default function AirTravelPage() {
           <>
             <div className="bg-white p-6 rounded-lg shadow mb-8">
               <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="flex items-center mb-4">
+                  <input
+                    type="checkbox"
+                    id="roundtrip"
+                    name="roundtrip"
+                    checked={airTravelData.roundtrip}
+                    onChange={handleChange}
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="roundtrip" className="ml-2 block text-sm text-gray-900">
+                    Round Trip
+                  </label>
+                </div>
+
                 <div>
-                  <label htmlFor="date" className="block text-sm font-medium text-gray-700">
-                    Date
+                  <label htmlFor="leave_date" className="block text-sm font-medium text-gray-700">
+                    Leave Date
                   </label>
                   <input
                     type="date"
-                    id="date"
-                    name="date"
-                    value={airTravelData.date}
+                    id="leave_date"
+                    name="leave_date"
+                    value={airTravelData.leave_date}
                     onChange={handleChange}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                     required
                   />
                 </div>
+
+                {airTravelData.roundtrip && (
+                  <div>
+                    <label htmlFor="return_date" className="block text-sm font-medium text-gray-700">
+                      Return Date
+                    </label>
+                    <input
+                      type="date"
+                      id="return_date"
+                      name="return_date"
+                      value={airTravelData.return_date || ''}
+                      onChange={handleChange}
+                      min={airTravelData.leave_date}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      required
+                    />
+                  </div>
+                )}
 
                 <div>
                   <label htmlFor="num_travelers" className="block text-sm font-medium text-gray-700">
@@ -719,7 +765,8 @@ export default function AirTravelPage() {
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Leave Date</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Return Date</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Travelers</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">From</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">To</th>
@@ -736,11 +783,23 @@ export default function AirTravelPage() {
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <input
                                   type="date"
-                                  name="date"
-                                  value={editForm?.date}
+                                  name="leave_date"
+                                  value={editForm?.leave_date}
                                   onChange={handleEditChange}
                                   className="border rounded px-2 py-1"
                                 />
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                {editForm?.roundtrip && (
+                                  <input
+                                    type="date"
+                                    name="return_date"
+                                    value={editForm?.return_date || ''}
+                                    onChange={handleEditChange}
+                                    min={editForm?.leave_date}
+                                    className="border rounded px-2 py-1"
+                                  />
+                                )}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <input
@@ -804,7 +863,10 @@ export default function AirTravelPage() {
                           ) : (
                             <>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                {formatDate(entry.date)}
+                                {formatDate(entry.leave_date)}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                {entry.return_date ? formatDate(entry.return_date) : 'N/A'}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">{entry.num_travelers}</td>
                               <td className="px-6 py-4 whitespace-nowrap">{entry.from || 'N/A'}</td>
