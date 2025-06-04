@@ -27,7 +27,7 @@ ChartJS.register(
 
 type GasolineData = {
   id?: string;
-  user_id: string;
+  household_id: string;
   date: string;
   dollars: number | null;
   dollar_gal: number | null;
@@ -46,8 +46,9 @@ const STORAGE_KEY = 'gasolineFormData';
 
 export default function GasolinePage() {
   const { user } = useAuth();
+  const [householdId, setHouseholdId] = useState<string | null>(null);
   const [gasolineData, setGasolineData] = useState<GasolineData>({
-    user_id: '',
+    household_id: '',
     date: '',
     dollars: null,
     dollar_gal: null,
@@ -81,14 +82,39 @@ export default function GasolinePage() {
 
   // Save form data to localStorage whenever it changes
   useEffect(() => {
-    if (typeof window !== 'undefined' && gasolineData.user_id) {
+    if (typeof window !== 'undefined' && gasolineData.household_id) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(gasolineData));
     }
   }, [gasolineData]);
 
+  // Fetch household ID for the user
+  useEffect(() => {
+    const fetchHouseholdId = async () => {
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('households')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching household ID:', error);
+        return;
+      }
+
+      if (data) {
+        setHouseholdId(data.id);
+      }
+    };
+
+    fetchHouseholdId();
+  }, [user]);
+
+  // Update fetchData to use household_id
   useEffect(() => {
     const fetchData = async () => {
-      if (!user) return;
+      if (!user || !householdId) return;
       
       const savedData = localStorage.getItem(STORAGE_KEY);
       if (savedData) {
@@ -98,7 +124,7 @@ export default function GasolinePage() {
       const { data, error } = await supabase
         .from('gasoline')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('household_id', householdId)
         .order('date', { ascending: false })
         .limit(1)
         .single();
@@ -113,7 +139,7 @@ export default function GasolinePage() {
       } else {
         const today = new Date();
         setGasolineData({
-          user_id: user.id,
+          household_id: householdId,
           date: today.toISOString().split('T')[0],
           dollars: null,
           dollar_gal: null,
@@ -125,16 +151,17 @@ export default function GasolinePage() {
     };
 
     fetchData();
-  }, [user]);
+  }, [user, householdId]);
 
+  // Update fetchMonthlyData to use household_id
   useEffect(() => {
     const fetchMonthlyData = async () => {
-      if (!user) return;
+      if (!user || !householdId) return;
 
       const { data, error } = await supabase
         .from('gasoline')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('household_id', householdId)
         .order('date', { ascending: true });
 
       if (error) {
@@ -179,15 +206,16 @@ export default function GasolinePage() {
     };
 
     fetchMonthlyData();
-  }, [user]);
+  }, [user, householdId]);
 
   const calculateCO2e = (gallons: number, CI_kg_gal: number | null): number => {
     const defaultCI = 9.46; // kg CO2e/gallon
     return gallons * (CI_kg_gal || defaultCI);
   };
 
+  // Update updateHouseholdGasoline to use household_id
   const updateHouseholdGasoline = async () => {
-    if (!user) return;
+    if (!user || !householdId) return;
 
     try {
       const twelveMonthsAgo = new Date();
@@ -199,7 +227,7 @@ export default function GasolinePage() {
       const { data: recentData, error: fetchError } = await supabase
         .from('gasoline')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('household_id', householdId)
         .gte('date', cutoffDate)
         .order('date', { ascending: true });
 
@@ -235,39 +263,14 @@ export default function GasolinePage() {
 
       console.log('Calculated overall average:', overallAverage);
 
-      // First check if the household record exists
-      const { data: householdData, error: householdError } = await supabase
+      const { error: updateError } = await supabase
         .from('households')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
+        .update({ gasoline: overallAverage })
+        .eq('id', householdId);
 
-      if (householdError) {
-        console.error('Error checking household record:', householdError);
-        throw householdError;
-      }
-
-      if (!householdData) {
-        console.log('Creating new household record');
-        const { error: insertError } = await supabase
-          .from('households')
-          .insert([{ user_id: user.id, gasoline: overallAverage }]);
-
-        if (insertError) {
-          console.error('Error creating household record:', insertError);
-          throw insertError;
-        }
-      } else {
-        console.log('Updating existing household record');
-        const { error: updateError } = await supabase
-          .from('households')
-          .update({ gasoline: overallAverage })
-          .eq('user_id', user.id);
-
-        if (updateError) {
-          console.error('Error updating household record:', updateError);
-          throw updateError;
-        }
+      if (updateError) {
+        console.error('Error updating household record:', updateError);
+        throw updateError;
       }
 
       console.log('Successfully updated household gasoline value:', overallAverage);
@@ -276,9 +279,10 @@ export default function GasolinePage() {
     }
   };
 
+  // Update handleSubmit to use household_id
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || !householdId) return;
 
     setLoading(true);
     setError(null);
@@ -300,7 +304,7 @@ export default function GasolinePage() {
         ...gasolineData,
         gallons,
         CO2e_kg,
-        user_id: user.id
+        household_id: householdId
       };
 
       if (isNewEntry) {
@@ -323,7 +327,7 @@ export default function GasolinePage() {
       setSuccess('Gasoline data saved successfully!');
       setIsNewEntry(true);
       setGasolineData({
-        user_id: user.id,
+        household_id: householdId,
         date: new Date().toISOString().split('T')[0],
         dollars: null,
         dollar_gal: null,
@@ -370,15 +374,16 @@ export default function GasolinePage() {
     }
   };
 
+  // Update handleDelete to use household_id
   const handleDelete = async (id: string) => {
-    if (!user) return;
+    if (!user || !householdId) return;
 
     try {
       const { error } = await supabase
         .from('gasoline')
         .delete()
         .eq('id', id)
-        .eq('user_id', user.id);
+        .eq('household_id', householdId);
 
       if (error) throw error;
 
@@ -422,16 +427,17 @@ export default function GasolinePage() {
     }
   };
 
+  // Update handleEditSubmit to use household_id
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !editingId || !editForm) return;
+    if (!user || !householdId || !editingId || !editForm) return;
 
     try {
       const { error } = await supabase
         .from('gasoline')
         .update(editForm)
         .eq('id', editingId)
-        .eq('user_id', user.id);
+        .eq('household_id', householdId);
 
       if (error) throw error;
 
