@@ -73,6 +73,10 @@ export default function AirTravelPage() {
   const [rawData, setRawData] = useState<AirTravelData[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<AirTravelData | null>(null);
+  const [monthlyTotals, setMonthlyTotals] = useState<{ [key: string]: { sum: number; count: number } }>({});
+  const [totalEmissions, setTotalEmissions] = useState<number>(0);
+  const [numberOfMonths, setNumberOfMonths] = useState<number>(0);
+  const [overallAverage, setOverallAverage] = useState<number>(0);
 
   // Load saved form data from localStorage
   useEffect(() => {
@@ -560,43 +564,55 @@ export default function AirTravelPage() {
           .from('households')
           .update({ air_travel: 0 })
           .eq('id', householdData.id);
+        
+        // Reset calculation values
+        setMonthlyTotals({});
+        setTotalEmissions(0);
+        setNumberOfMonths(0);
+        setOverallAverage(0);
         return;
       }
 
       console.log('Found air travel data entries:', recentData.length);
 
       // Create a map of all months in the range, initialized with zero emissions
-      const monthlyTotals: { [key: string]: { sum: number; count: number } } = {};
+      const monthlyTotalsMap: { [key: string]: { sum: number; count: number } } = {};
       const currentDate = new Date(twelveMonthsAgo);
       while (currentDate <= new Date()) {
         const monthKey = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
-        monthlyTotals[monthKey] = { sum: 0, count: 0 };
+        monthlyTotalsMap[monthKey] = { sum: 0, count: 0 };
         currentDate.setMonth(currentDate.getMonth() + 1);
       }
 
       // Sum up emissions for each month that has travel
       recentData.forEach(entry => {
         const month = new Date(entry.leave_date).toLocaleString('default', { month: 'long', year: 'numeric' });
-        monthlyTotals[month].sum += entry.co2e_kg;
-        monthlyTotals[month].count += 1;
+        monthlyTotalsMap[month].sum += entry.co2e_kg;
+        monthlyTotalsMap[month].count += 1;
       });
 
-      console.log('Monthly totals:', monthlyTotals);
+      console.log('Monthly totals:', monthlyTotalsMap);
 
       // Calculate total emissions and number of months
-      const totalEmissions = Object.values(monthlyTotals).reduce((sum, { sum: monthSum }) => sum + monthSum, 0);
-      const numberOfMonths = Object.keys(monthlyTotals).length;
+      const totalEmissionsValue = Object.values(monthlyTotalsMap).reduce((sum, { sum: monthSum }) => sum + monthSum, 0);
+      const numberOfMonthsValue = Object.keys(monthlyTotalsMap).length;
 
       // Calculate average monthly emissions
-      const overallAverage = totalEmissions / numberOfMonths;
+      const overallAverageValue = totalEmissionsValue / numberOfMonthsValue;
 
-      console.log('Total emissions:', totalEmissions);
-      console.log('Number of months:', numberOfMonths);
-      console.log('Calculated overall average:', overallAverage);
+      console.log('Total emissions:', totalEmissionsValue);
+      console.log('Number of months:', numberOfMonthsValue);
+      console.log('Calculated overall average:', overallAverageValue);
+
+      // Update state with calculation values
+      setMonthlyTotals(monthlyTotalsMap);
+      setTotalEmissions(totalEmissionsValue);
+      setNumberOfMonths(numberOfMonthsValue);
+      setOverallAverage(overallAverageValue);
 
       const { error: updateError } = await supabase
         .from('households')
-        .update({ air_travel: overallAverage })
+        .update({ air_travel: overallAverageValue })
         .eq('id', householdData.id);
 
       if (updateError) {
@@ -604,7 +620,7 @@ export default function AirTravelPage() {
         throw updateError;
       }
 
-      console.log('Successfully updated household air travel value:', overallAverage);
+      console.log('Successfully updated household air travel value:', overallAverageValue);
     } catch (error) {
       console.error('Error in updateHouseholdAirTravel:', error);
     }
@@ -1047,6 +1063,38 @@ export default function AirTravelPage() {
                 </div>
               </div>
             )}
+
+            {/* Debug Information */}
+            <div className="bg-white p-6 rounded-lg shadow mt-8">
+              <h2 className="text-xl font-bold mb-4">Calculation Details</h2>
+              <div className="space-y-4">
+                <div>
+                  <h3 className="font-semibold text-gray-700">Monthly Breakdown</h3>
+                  <div className="mt-2 space-y-2">
+                    {Object.entries(monthlyTotals).map(([month, data]) => (
+                      <div key={month} className="flex justify-between items-center">
+                        <span className="text-gray-600">{month}</span>
+                        <span className="font-mono">{data.sum.toFixed(2)} kg CO2e</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="pt-4 border-t">
+                  <div className="flex justify-between items-center">
+                    <span className="font-semibold text-gray-700">Total Emissions</span>
+                    <span className="font-mono">{totalEmissions.toFixed(2)} kg CO2e</span>
+                  </div>
+                  <div className="flex justify-between items-center mt-2">
+                    <span className="font-semibold text-gray-700">Number of Months</span>
+                    <span className="font-mono">{numberOfMonths}</span>
+                  </div>
+                  <div className="flex justify-between items-center mt-2">
+                    <span className="font-semibold text-gray-700">Monthly Average</span>
+                    <span className="font-mono">{overallAverage.toFixed(2)} kg CO2e</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </>
         )}
       </div>
