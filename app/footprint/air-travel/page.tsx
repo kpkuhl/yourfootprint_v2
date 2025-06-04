@@ -574,15 +574,26 @@ export default function AirTravelPage() {
         return;
       }
 
+      console.log('All air travel data:', allData);
+
       // Get the current date and calculate the maximum allowed future date (12 months from now)
       const currentDate = new Date();
+      currentDate.setHours(0, 0, 0, 0); // Set to start of day
       const maxFutureDate = new Date(currentDate);
       maxFutureDate.setMonth(maxFutureDate.getMonth() + 12);
 
       // Find the farthest future date in the data, but not beyond maxFutureDate
       const futureDates = allData
-        .map(entry => new Date(entry.leave_date))
+        .map(entry => {
+          const date = new Date(entry.leave_date);
+          date.setHours(0, 0, 0, 0);
+          return date;
+        })
         .filter(date => date > currentDate && date <= maxFutureDate);
+
+      console.log('Current date:', currentDate);
+      console.log('Max future date:', maxFutureDate);
+      console.log('Future dates found:', futureDates);
 
       // If we have future dates, use the farthest one; otherwise use current date
       const endDate = futureDates.length > 0 
@@ -592,18 +603,17 @@ export default function AirTravelPage() {
       // Calculate the start date (12 months before the end date)
       const startDate = new Date(endDate);
       startDate.setMonth(startDate.getMonth() - 12);
-      const cutoffDate = startDate.toISOString().split('T')[0];
+      startDate.setHours(0, 0, 0, 0);
 
       console.log('End date for calculation:', endDate);
       console.log('Start date for calculation:', startDate);
-      console.log('Cutoff date:', cutoffDate);
 
       // Get data for the calculated date range
       const { data: recentData, error: fetchError } = await supabase
         .from('air_travel')
         .select('*')
         .eq('household_id', householdData.id)
-        .gte('leave_date', cutoffDate)
+        .gte('leave_date', startDate.toISOString().split('T')[0])
         .order('leave_date', { ascending: true });
 
       if (fetchError) {
@@ -611,15 +621,12 @@ export default function AirTravelPage() {
         throw fetchError;
       }
 
-      console.log('Found air travel data entries:', recentData.length);
+      console.log('Recent data found:', recentData);
 
       // Create a map of all months in the range, initialized with zero emissions
       const monthlyTotalsMap: { [key: string]: { sum: number; count: number } } = {};
       const currentDateInRange = new Date(startDate);
-      // Set to first day of the month to ensure consistent month counting
-      currentDateInRange.setDate(1);
-      const endDateInRange = new Date(endDate);
-      endDateInRange.setDate(1);
+      currentDateInRange.setDate(1); // Set to first day of month
       
       // Count exactly 12 months
       for (let i = 0; i < 12; i++) {
@@ -628,22 +635,25 @@ export default function AirTravelPage() {
         currentDateInRange.setMonth(currentDateInRange.getMonth() + 1);
       }
 
+      console.log('Initial monthly totals:', monthlyTotalsMap);
+
       // Sum up emissions for each month that has travel
       recentData.forEach(entry => {
         const entryDate = new Date(entry.leave_date);
-        entryDate.setDate(1); // Set to first day of month for consistent comparison
-        if (entryDate >= startDate && entryDate <= endDateInRange) {
-          const month = entryDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+        entryDate.setHours(0, 0, 0, 0);
+        const month = entryDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+        if (monthlyTotalsMap[month]) {
           monthlyTotalsMap[month].sum += entry.co2e_kg;
           monthlyTotalsMap[month].count += 1;
+          console.log(`Adding ${entry.co2e_kg} to ${month}, new total: ${monthlyTotalsMap[month].sum}`);
         }
       });
 
-      console.log('Monthly totals:', monthlyTotalsMap);
+      console.log('Final monthly totals:', monthlyTotalsMap);
 
       // Calculate total emissions and number of months
       const totalEmissionsValue = Object.values(monthlyTotalsMap).reduce((sum, { sum: monthSum }) => sum + monthSum, 0);
-      const numberOfMonthsValue = Object.keys(monthlyTotalsMap).length;
+      const numberOfMonthsValue = 12; // Always 12 months
 
       // Calculate average monthly emissions
       const overallAverageValue = totalEmissionsValue / numberOfMonthsValue;
