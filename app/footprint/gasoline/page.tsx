@@ -95,7 +95,7 @@ export default function GasolinePage() {
       const { data, error } = await supabase
         .from('households')
         .select('id')
-        .eq('id', user.id)
+        .eq('user_id', user.id)
         .single();
 
       if (error) {
@@ -209,7 +209,7 @@ export default function GasolinePage() {
   }, [user, householdId]);
 
   const calculateCO2e = (gallons: number, CI_kg_gal: number | null): number => {
-    const defaultCI = 9.46; // kg CO2e/gallon
+    const defaultCI = 9.46; // kg CO2e/gallon for regular gasoline
     return gallons * (CI_kg_gal || defaultCI);
   };
 
@@ -301,14 +301,23 @@ export default function GasolinePage() {
         gallons = gasolineData.dollars / gasolineData.dollar_gal;
       }
 
+      // Validate required fields
       if (!gallons) {
         throw new Error('Please provide either gallons or both dollars spent and price per gallon');
       }
 
-      const CO2e_kg = calculateCO2e(gallons, gasolineData.CI_kg_gal);
+      if (!gasolineData.date) {
+        throw new Error('Please provide a date');
+      }
+
+      // Use default CI_kg_gal if not provided
+      const CI_kg_gal = gasolineData.CI_kg_gal || 9.46; // Default value for regular gasoline
+      const CO2e_kg = calculateCO2e(gallons, CI_kg_gal);
+
       const dataToSubmit = {
         ...gasolineData,
         gallons,
+        CI_kg_gal,
         CO2e_kg,
         household_id: householdId
       };
