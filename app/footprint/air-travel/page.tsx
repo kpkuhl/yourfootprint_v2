@@ -600,9 +600,15 @@ export default function AirTravelPage() {
         ? new Date(Math.max(...futureDates.map(d => d.getTime())))
         : currentDate;
 
+      // Set end date to the last day of its month
+      endDate.setMonth(endDate.getMonth() + 1);
+      endDate.setDate(0);
+      endDate.setHours(23, 59, 59, 999);
+
       // Calculate the start date (12 months before the end date)
       const startDate = new Date(endDate);
-      startDate.setMonth(startDate.getMonth() - 12);
+      startDate.setMonth(startDate.getMonth() - 11); // Go back 11 months to get 12 months total
+      startDate.setDate(1); // Set to first day of month
       startDate.setHours(0, 0, 0, 0);
 
       console.log('End date for calculation:', endDate);
@@ -614,6 +620,7 @@ export default function AirTravelPage() {
         .select('*')
         .eq('household_id', householdData.id)
         .gte('leave_date', startDate.toISOString().split('T')[0])
+        .lte('leave_date', endDate.toISOString().split('T')[0])
         .order('leave_date', { ascending: true });
 
       if (fetchError) {
@@ -626,7 +633,6 @@ export default function AirTravelPage() {
       // Create a map of all months in the range, initialized with zero emissions
       const monthlyTotalsMap: { [key: string]: { sum: number; count: number } } = {};
       const currentDateInRange = new Date(startDate);
-      currentDateInRange.setDate(1); // Set to first day of month
       
       // Count exactly 12 months
       for (let i = 0; i < 12; i++) {
