@@ -27,7 +27,7 @@ ChartJS.register(
 
 type WaterData = {
   id?: string;
-  user_id: string;
+  household_id: string;
   start_date: string;
   end_date: string;
   amount_gal: number;
@@ -83,8 +83,9 @@ function formatDate(dateString: string): string {
 
 export default function WaterPage() {
   const { user } = useAuth();
+  const [householdId, setHouseholdId] = useState<string | null>(null);
   const [waterData, setWaterData] = useState<WaterData>({
-    user_id: '',
+    household_id: '',
     start_date: '',
     end_date: '',
     amount_gal: 0,
@@ -143,14 +144,38 @@ export default function WaterPage() {
 
   // Save form data to localStorage whenever it changes
   useEffect(() => {
-    if (typeof window !== 'undefined' && waterData.user_id) {
+    if (typeof window !== 'undefined' && waterData.household_id) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(waterData));
     }
   }, [waterData]);
 
+  // Fetch household ID
+  useEffect(() => {
+    const fetchHouseholdId = async () => {
+      if (!user) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('households')
+          .select('id')
+          .eq('user_id', user.id)
+          .single();
+
+        if (error) throw error;
+        if (data) {
+          setHouseholdId(data.id);
+        }
+      } catch (error) {
+        console.error('Error fetching household ID:', error);
+      }
+    };
+
+    fetchHouseholdId();
+  }, [user]);
+
   useEffect(() => {
     const fetchData = async () => {
-      if (!user) return;
+      if (!user || !householdId) return;
       
       const savedData = localStorage.getItem(STORAGE_KEY);
       if (savedData) {
@@ -160,7 +185,7 @@ export default function WaterPage() {
       const { data, error } = await supabase
         .from('water')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('household_id', householdId)
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
@@ -178,7 +203,7 @@ export default function WaterPage() {
         const today = new Date();
         const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
         setWaterData({
-          user_id: user.id,
+          household_id: householdId,
           start_date: lastMonth.toISOString().split('T')[0],
           end_date: today.toISOString().split('T')[0],
           amount_gal: 0,
@@ -189,16 +214,16 @@ export default function WaterPage() {
     };
 
     fetchData();
-  }, [user]);
+  }, [user, householdId]);
 
   useEffect(() => {
     const fetchMonthlyData = async () => {
-      if (!user) return;
+      if (!user || !householdId) return;
 
       const { data, error } = await supabase
         .from('water')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('household_id', householdId)
         .order('start_date', { ascending: true });
 
       if (error) {
@@ -218,7 +243,7 @@ export default function WaterPage() {
     };
 
     fetchMonthlyData();
-  }, [user]);
+  }, [user, householdId]);
 
   const convertToGallons = (amount: number, fromUnit: string): number => {
     if (fromUnit === 'gallons') return amount;
@@ -241,7 +266,7 @@ export default function WaterPage() {
   };
 
   const updateHouseholdWater = async () => {
-    if (!user) return;
+    if (!user || !householdId) return;
 
     try {
       const twelveMonthsAgo = new Date();
@@ -251,7 +276,7 @@ export default function WaterPage() {
       const { data: recentData, error: fetchError } = await supabase
         .from('water')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('household_id', householdId)
         .gte('start_date', cutoffDate)
         .order('start_date', { ascending: true });
 
@@ -281,7 +306,7 @@ export default function WaterPage() {
       const { error: updateError } = await supabase
         .from('households')
         .update({ water: overallAverage })
-        .eq('user_id', user.id);
+        .eq('id', householdId);
 
       if (updateError) throw updateError;
 
@@ -294,7 +319,7 @@ export default function WaterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || !householdId) return;
 
     setLoading(true);
     setError(null);
@@ -307,7 +332,7 @@ export default function WaterPage() {
       const { error } = await supabase
         .from('water')
         .insert([{
-          user_id: user.id,
+          household_id: householdId,
           start_date: waterData.start_date,
           end_date: waterData.end_date,
           amount_gal: Number(amount_gal),
@@ -324,7 +349,7 @@ export default function WaterPage() {
       const today = new Date();
       const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
       setWaterData({
-        user_id: user.id,
+        household_id: householdId,
         start_date: lastMonth.toISOString().split('T')[0],
         end_date: today.toISOString().split('T')[0],
         amount_gal: 0,
@@ -402,7 +427,7 @@ export default function WaterPage() {
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !editingId || !editForm) return;
+    if (!user || !householdId || !editingId || !editForm) return;
 
     try {
       const finalCI = Number(inputEditCI);
@@ -427,7 +452,7 @@ export default function WaterPage() {
           CO2e_kg: finalForm.CO2e_kg
         })
         .eq('id', editingId)
-        .eq('user_id', user.id);
+        .eq('household_id', householdId);
 
       if (error) throw error;
 
@@ -457,14 +482,14 @@ export default function WaterPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!user) return;
+    if (!user || !householdId) return;
 
     try {
       const { error } = await supabase
         .from('water')
         .delete()
         .eq('id', id)
-        .eq('user_id', user.id);
+        .eq('household_id', householdId);
 
       if (error) throw error;
 
