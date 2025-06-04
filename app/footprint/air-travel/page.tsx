@@ -51,6 +51,7 @@ const STORAGE_KEY = 'airTravelFormData';
 
 export default function AirTravelPage() {
   const { user } = useAuth();
+  const [householdId, setHouseholdId] = useState<string | null>(null);
   const [airTravelData, setAirTravelData] = useState<AirTravelData>({
     household_id: '',
     leave_date: '',
@@ -100,88 +101,86 @@ export default function AirTravelPage() {
     }
   }, [airTravelData]);
 
+  // Fetch household ID for the user
+  useEffect(() => {
+    const fetchHouseholdId = async () => {
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('households')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching household ID:', error);
+        return;
+      }
+
+      if (data) {
+        setHouseholdId(data.id);
+      }
+    };
+
+    fetchHouseholdId();
+  }, [user]);
+
+  // Update fetchData to use household_id
   useEffect(() => {
     const fetchData = async () => {
-      if (!user) return;
+      if (!user || !householdId) return;
       
       const savedData = localStorage.getItem(STORAGE_KEY);
       if (savedData) {
         return;
       }
       
-      // First get the household_id
-      const { data: householdData, error: householdError } = await supabase
-        .from('households')
-        .select('id')
-        .eq('user_id', user.id)
+      const { data, error } = await supabase
+        .from('air_travel')
+        .select('*')
+        .eq('household_id', householdId)
+        .order('leave_date', { ascending: false })
+        .limit(1)
         .single();
 
-      if (householdError) {
-        console.error('Error fetching household data:', householdError);
+      if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
+        console.error('Error fetching data:', error);
         return;
       }
-
-      if (householdData) {
-        const { data, error } = await supabase
-          .from('air_travel')
-          .select('*')
-          .eq('household_id', householdData.id)
-          .order('leave_date', { ascending: false })
-          .limit(1)
-          .single();
-
-        if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
-          console.error('Error fetching data:', error);
-          return;
-        }
-        
-        if (data) {
-          setAirTravelData(data);
-        } else {
-          const today = new Date();
-          setAirTravelData({
-            household_id: householdData.id,
-            leave_date: today.toISOString().split('T')[0],
-            return_date: null,
-            roundtrip: false,
-            num_travelers: 1,
-            from: null,
-            to: null,
-            distance: null,
-            co2e_kg_traveler: null,
-            co2e_kg: 0,
-            direct_co2e_input: false,
-            co2e_kg_per_trip: null
-          });
-        }
+      
+      if (data) {
+        setAirTravelData(data);
+      } else {
+        const today = new Date();
+        setAirTravelData({
+          household_id: householdId,
+          leave_date: today.toISOString().split('T')[0],
+          return_date: null,
+          roundtrip: false,
+          num_travelers: 1,
+          from: null,
+          to: null,
+          distance: null,
+          co2e_kg_traveler: null,
+          co2e_kg: 0,
+          direct_co2e_input: false,
+          co2e_kg_per_trip: null
+        });
       }
     };
 
     fetchData();
-  }, [user]);
+  }, [user, householdId]);
 
+  // Update fetchMonthlyData to use household_id
   useEffect(() => {
     const fetchMonthlyData = async () => {
-      if (!user) return;
-
-      // First get the household_id
-      const { data: householdData, error: householdError } = await supabase
-        .from('households')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (householdError) {
-        console.error('Error fetching household data:', householdError);
-        return;
-      }
-
-      if (!householdData) return;
+      if (!user || !householdId) return;
 
       const { data, error } = await supabase
         .from('air_travel')
         .select('*')
-        .eq('household_id', householdData.id)
+        .eq('household_id', householdId)
         .order('leave_date', { ascending: true });
 
       if (error) {
@@ -226,7 +225,7 @@ export default function AirTravelPage() {
     };
 
     fetchMonthlyData();
-  }, [user]);
+  }, [user, householdId]);
 
   // Add new useEffect to initialize debug values
   useEffect(() => {
@@ -243,35 +242,21 @@ export default function AirTravelPage() {
     return distance * num_travelers * co2e_kg_traveler;
   };
 
+  // Update handleSubmit to use household_id
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || !householdId) return;
 
     setLoading(true);
     setError(null);
     setSuccess(null);
 
     try {
-      // First get the household_id
-      const { data: householdData, error: householdError } = await supabase
-        .from('households')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (householdError) {
-        throw new Error('Error fetching household data');
-      }
-
-      if (!householdData) {
-        throw new Error('No household found for this user');
-      }
-
       const co2e_kg = calculateCO2e(airTravelData.distance, airTravelData.num_travelers, airTravelData.co2e_kg_traveler, airTravelData.co2e_kg_per_trip, airTravelData.direct_co2e_input);
       
       // Prepare data for submission
       const dataToSubmit = {
-        household_id: householdData.id,
+        household_id: householdId,
         leave_date: airTravelData.leave_date,
         return_date: airTravelData.return_date,
         roundtrip: airTravelData.roundtrip,
@@ -311,7 +296,7 @@ export default function AirTravelPage() {
       setSuccess('Air travel data saved successfully!');
       setIsNewEntry(true);
       setAirTravelData({
-        household_id: householdData.id,
+        household_id: householdId,
         leave_date: new Date().toISOString().split('T')[0],
         return_date: null,
         roundtrip: false,
@@ -391,14 +376,16 @@ export default function AirTravelPage() {
     }
   };
 
+  // Update handleDelete to use household_id
   const handleDelete = async (id: string) => {
-    if (!user) return;
+    if (!user || !householdId) return;
 
     try {
       const { error } = await supabase
         .from('air_travel')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('household_id', householdId);
 
       if (error) throw error;
 
@@ -462,9 +449,10 @@ export default function AirTravelPage() {
     }
   };
 
+  // Update handleEditSubmit to use household_id
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !editingId || !editForm) return;
+    if (!user || !householdId || !editingId || !editForm) return;
 
     try {
       const co2e_kg = calculateCO2e(
@@ -477,7 +465,7 @@ export default function AirTravelPage() {
 
       // Prepare data for submission
       const dataToSubmit = {
-        household_id: editForm.household_id,
+        household_id: householdId,
         leave_date: editForm.leave_date,
         return_date: editForm.return_date,
         roundtrip: editForm.roundtrip,
@@ -494,7 +482,8 @@ export default function AirTravelPage() {
       const { error } = await supabase
         .from('air_travel')
         .update(dataToSubmit)
-        .eq('id', editingId);
+        .eq('id', editingId)
+        .eq('household_id', householdId);
 
       if (error) {
         console.error('Error updating air travel entry:', error);
@@ -528,29 +517,16 @@ export default function AirTravelPage() {
     }
   };
 
+  // Update updateHouseholdAirTravel to use household_id
   const updateHouseholdAirTravel = async () => {
-    if (!user) return;
+    if (!user || !householdId) return;
 
     try {
-      // First get the household_id
-      const { data: householdData, error: householdError } = await supabase
-        .from('households')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (householdError) {
-        console.error('Error fetching household data:', householdError);
-        return;
-      }
-
-      if (!householdData) return;
-
       // First get all air travel data to find the date range
       const { data: allData, error: allDataError } = await supabase
         .from('air_travel')
         .select('*')
-        .eq('household_id', householdData.id)
+        .eq('household_id', householdId)
         .order('leave_date', { ascending: true });
 
       if (allDataError) {
@@ -564,7 +540,7 @@ export default function AirTravelPage() {
         const { error: updateError } = await supabase
           .from('households')
           .update({ air_travel: 0 })
-          .eq('id', householdData.id);
+          .eq('id', householdId);
         
         // Reset calculation values
         setMonthlyTotals({});
@@ -618,7 +594,7 @@ export default function AirTravelPage() {
       const { data: recentData, error: fetchError } = await supabase
         .from('air_travel')
         .select('*')
-        .eq('household_id', householdData.id)
+        .eq('household_id', householdId)
         .gte('leave_date', startDate.toISOString().split('T')[0])
         .lte('leave_date', endDate.toISOString().split('T')[0])
         .order('leave_date', { ascending: true });
@@ -677,7 +653,7 @@ export default function AirTravelPage() {
       const { error: updateError } = await supabase
         .from('households')
         .update({ air_travel: overallAverageValue })
-        .eq('id', householdData.id);
+        .eq('id', householdId);
 
       if (updateError) {
         console.error('Error updating household record:', updateError);
