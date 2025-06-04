@@ -27,7 +27,7 @@ ChartJS.register(
 
 type ElectricityData = {
   id?: string;
-  user_id: string;
+  household_id: string;
   start_date: string;
   end_date: string;
   amount_kWh: number;
@@ -83,8 +83,9 @@ function formatDate(dateString: string): string {
 
 export default function ElectricityPage() {
   const { user } = useAuth();
+  const [householdId, setHouseholdId] = useState<string | null>(null);
   const [electricityData, setElectricityData] = useState<ElectricityData>({
-    user_id: '',
+    household_id: '',
     start_date: '',
     end_date: '',
     amount_kWh: 0,
@@ -147,15 +148,40 @@ export default function ElectricityPage() {
   // Save form data to localStorage whenever it changes
   useEffect(() => {
     console.log('electricityData changed:', electricityData);
-    if (typeof window !== 'undefined' && electricityData.user_id) {
+    if (typeof window !== 'undefined' && electricityData.household_id) {
       console.log('Saving to localStorage:', electricityData);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(electricityData));
     }
   }, [electricityData]);
 
+  // Fetch household ID for the user
+  useEffect(() => {
+    const fetchHouseholdId = async () => {
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('households')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching household ID:', error);
+        return;
+      }
+
+      if (data) {
+        setHouseholdId(data.id);
+      }
+    };
+
+    fetchHouseholdId();
+  }, [user]);
+
+  // Update fetchData to use household_id
   useEffect(() => {
     const fetchData = async () => {
-      if (!user) return;
+      if (!user || !householdId) return;
       
       // Check localStorage first
       const savedData = localStorage.getItem(STORAGE_KEY);
@@ -164,11 +190,11 @@ export default function ElectricityPage() {
         return;
       }
       
-      console.log('No localStorage data found, fetching from Supabase for user:', user.id);
+      console.log('No localStorage data found, fetching from Supabase for household:', householdId);
       const { data, error } = await supabase
         .from('electricity')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('household_id', householdId)
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
@@ -189,7 +215,7 @@ export default function ElectricityPage() {
         const today = new Date();
         const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
         setElectricityData({
-          user_id: user.id,
+          household_id: householdId,
           start_date: lastMonth.toISOString().split('T')[0],
           end_date: today.toISOString().split('T')[0],
           amount_kWh: 0,
@@ -200,17 +226,17 @@ export default function ElectricityPage() {
     };
 
     fetchData();
-  }, [user]);
+  }, [user, householdId]);
 
-  // Update fetchMonthlyData to include id in monthly data
+  // Update fetchMonthlyData to use household_id
   useEffect(() => {
     const fetchMonthlyData = async () => {
-      if (!user) return;
+      if (!user || !householdId) return;
 
       const { data, error } = await supabase
         .from('electricity')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('household_id', householdId)
         .order('start_date', { ascending: true });
 
       if (error) {
@@ -231,7 +257,7 @@ export default function ElectricityPage() {
     };
 
     fetchMonthlyData();
-  }, [user]);
+  }, [user, householdId]);
 
   const convertToKWh = (amount: number, fromUnit: string): number => {
     if (fromUnit === 'kWh') return amount;
@@ -268,7 +294,7 @@ export default function ElectricityPage() {
       const { data: recentData, error: fetchError } = await supabase
         .from('electricity')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('household_id', householdId)
         .gte('start_date', cutoffDate)
         .order('start_date', { ascending: true });
 
@@ -301,7 +327,7 @@ export default function ElectricityPage() {
       const { error: updateError } = await supabase
         .from('households')
         .update({ electricity: overallAverage })
-        .eq('user_id', user.id);
+        .eq('id', householdId);
 
       if (updateError) throw updateError;
 
@@ -312,10 +338,10 @@ export default function ElectricityPage() {
     }
   };
 
-  // Call updateHouseholdElectricity after successful form submission
+  // Update handleSubmit to use household_id
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || !householdId) return;
 
     setLoading(true);
     setError(null);
@@ -328,7 +354,7 @@ export default function ElectricityPage() {
       const { error } = await supabase
         .from('electricity')
         .insert([{
-          user_id: user.id,
+          household_id: householdId,
           start_date: electricityData.start_date,
           end_date: electricityData.end_date,
           amount_kWh: Number(amount_kWh),
@@ -348,7 +374,7 @@ export default function ElectricityPage() {
       const today = new Date();
       const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
       setElectricityData({
-        user_id: user.id,
+        household_id: householdId,
         start_date: lastMonth.toISOString().split('T')[0],
         end_date: today.toISOString().split('T')[0],
         amount_kWh: 0,
@@ -425,10 +451,10 @@ export default function ElectricityPage() {
     }
   };
 
-  // Also update household electricity after successful edit
+  // Update handleEditSubmit to use household_id
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !editingId || !editForm) return;
+    if (!user || !householdId || !editingId || !editForm) return;
 
     try {
       // Convert CI_kg_kWh to number one final time
@@ -455,7 +481,7 @@ export default function ElectricityPage() {
           CO2e: finalForm.CO2e
         })
         .eq('id', editingId)
-        .eq('user_id', user.id);
+        .eq('household_id', householdId);
 
       if (error) throw error;
 
@@ -487,16 +513,16 @@ export default function ElectricityPage() {
     }
   };
 
-  // Also update household electricity after successful deletion
+  // Update handleDelete to use household_id
   const handleDelete = async (id: string) => {
-    if (!user) return;
+    if (!user || !householdId) return;
 
     try {
       const { error } = await supabase
         .from('electricity')
         .delete()
         .eq('id', id)
-        .eq('user_id', user.id);
+        .eq('household_id', householdId);
 
       if (error) throw error;
 
