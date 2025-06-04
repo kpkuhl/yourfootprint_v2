@@ -555,26 +555,37 @@ export default function AirTravelPage() {
 
       if (!recentData || recentData.length === 0) {
         console.log('No air travel data found for the last 12 months');
+        // Update household with zero emissions
+        const { error: updateError } = await supabase
+          .from('households')
+          .update({ air_travel: 0 })
+          .eq('id', householdData.id);
         return;
       }
 
       console.log('Found air travel data entries:', recentData.length);
 
+      // Create a map of all months in the range, initialized with zero emissions
       const monthlyTotals: { [key: string]: { sum: number; count: number } } = {};
-      
+      const currentDate = new Date(twelveMonthsAgo);
+      while (currentDate <= new Date()) {
+        const monthKey = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+        monthlyTotals[monthKey] = { sum: 0, count: 0 };
+        currentDate.setMonth(currentDate.getMonth() + 1);
+      }
+
+      // Sum up emissions for each month that has travel
       recentData.forEach(entry => {
         const month = new Date(entry.leave_date).toLocaleString('default', { month: 'long', year: 'numeric' });
-        if (!monthlyTotals[month]) {
-          monthlyTotals[month] = { sum: 0, count: 0 };
-        }
         monthlyTotals[month].sum += entry.co2e_kg;
         monthlyTotals[month].count += 1;
       });
 
       console.log('Monthly totals:', monthlyTotals);
 
+      // Calculate average across all months (including those with no travel)
       const monthlyAverages = Object.values(monthlyTotals).map(
-        ({ sum, count }) => sum / count
+        ({ sum }) => sum // We don't need to divide by count since we want total per month
       );
       const overallAverage = monthlyAverages.reduce((a, b) => a + b, 0) / monthlyAverages.length;
 
