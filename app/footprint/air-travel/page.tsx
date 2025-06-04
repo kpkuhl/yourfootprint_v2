@@ -940,6 +940,55 @@ export default function AirTravelPage() {
                                 />
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="space-y-2">
+                                  <div className="flex items-center">
+                                    <input
+                                      type="checkbox"
+                                      id="edit_direct_co2e_input"
+                                      name="direct_co2e_input"
+                                      checked={editForm?.direct_co2e_input}
+                                      onChange={handleEditChange}
+                                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                                    />
+                                    <label htmlFor="edit_direct_co2e_input" className="ml-2 text-sm text-gray-900">
+                                      Direct CO2e input
+                                    </label>
+                                  </div>
+                                  {editForm?.direct_co2e_input ? (
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      name="co2e_kg_per_trip"
+                                      value={editForm?.co2e_kg_per_trip || ''}
+                                      onChange={handleEditChange}
+                                      className="border rounded px-2 py-1 w-32"
+                                      placeholder="CO2e per trip"
+                                    />
+                                  ) : (
+                                    <>
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        name="distance"
+                                        value={editForm?.distance || ''}
+                                        onChange={handleEditChange}
+                                        className="border rounded px-2 py-1 w-32 mb-2"
+                                        placeholder="Distance"
+                                      />
+                                      <input
+                                        type="number"
+                                        step="0.0001"
+                                        name="co2e_kg_traveler"
+                                        value={editForm?.co2e_kg_traveler || ''}
+                                        onChange={handleEditChange}
+                                        className="border rounded px-2 py-1 w-32"
+                                        placeholder="CO2e per mile"
+                                      />
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
                                 {editForm?.co2e_kg.toFixed(2)}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
