@@ -228,6 +228,13 @@ export default function AirTravelPage() {
     fetchMonthlyData();
   }, [user]);
 
+  // Add new useEffect to initialize debug values
+  useEffect(() => {
+    if (user) {
+      updateHouseholdAirTravel();
+    }
+  }, [user]);
+
   const calculateCO2e = (distance: number | null, num_travelers: number, co2e_kg_traveler: number | null, co2e_kg_per_trip: number | null, direct_co2e_input: boolean): number => {
     if (direct_co2e_input && co2e_kg_per_trip) {
       return co2e_kg_per_trip * num_travelers;
