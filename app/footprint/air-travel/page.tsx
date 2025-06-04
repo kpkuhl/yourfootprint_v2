@@ -583,12 +583,15 @@ export default function AirTravelPage() {
 
       console.log('Monthly totals:', monthlyTotals);
 
-      // Calculate average across all months (including those with no travel)
-      const monthlyAverages = Object.values(monthlyTotals).map(
-        ({ sum }) => sum // We don't need to divide by count since we want total per month
-      );
-      const overallAverage = monthlyAverages.reduce((a, b) => a + b, 0) / monthlyAverages.length;
+      // Calculate total emissions and number of months
+      const totalEmissions = Object.values(monthlyTotals).reduce((sum, { sum: monthSum }) => sum + monthSum, 0);
+      const numberOfMonths = Object.keys(monthlyTotals).length;
 
+      // Calculate average monthly emissions
+      const overallAverage = totalEmissions / numberOfMonths;
+
+      console.log('Total emissions:', totalEmissions);
+      console.log('Number of months:', numberOfMonths);
       console.log('Calculated overall average:', overallAverage);
 
       const { error: updateError } = await supabase
