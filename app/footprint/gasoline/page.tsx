@@ -289,6 +289,12 @@ export default function GasolinePage() {
     setSuccess(null);
 
     try {
+      // Force schema refresh by making a simple query
+      await supabase
+        .from('gasoline')
+        .select('id')
+        .limit(1);
+
       // Calculate gallons from dollars and price per gallon if gallons not provided
       let gallons = gasolineData.gallons;
       if (!gallons && gasolineData.dollars && gasolineData.dollar_gal) {
