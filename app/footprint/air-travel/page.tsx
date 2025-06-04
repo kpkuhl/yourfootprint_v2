@@ -616,7 +616,13 @@ export default function AirTravelPage() {
       // Create a map of all months in the range, initialized with zero emissions
       const monthlyTotalsMap: { [key: string]: { sum: number; count: number } } = {};
       const currentDateInRange = new Date(startDate);
-      while (currentDateInRange <= endDate) {
+      // Set to first day of the month to ensure consistent month counting
+      currentDateInRange.setDate(1);
+      const endDateInRange = new Date(endDate);
+      endDateInRange.setDate(1);
+      
+      // Count exactly 12 months
+      for (let i = 0; i < 12; i++) {
         const monthKey = currentDateInRange.toLocaleString('default', { month: 'long', year: 'numeric' });
         monthlyTotalsMap[monthKey] = { sum: 0, count: 0 };
         currentDateInRange.setMonth(currentDateInRange.getMonth() + 1);
@@ -624,9 +630,13 @@ export default function AirTravelPage() {
 
       // Sum up emissions for each month that has travel
       recentData.forEach(entry => {
-        const month = new Date(entry.leave_date).toLocaleString('default', { month: 'long', year: 'numeric' });
-        monthlyTotalsMap[month].sum += entry.co2e_kg;
-        monthlyTotalsMap[month].count += 1;
+        const entryDate = new Date(entry.leave_date);
+        entryDate.setDate(1); // Set to first day of month for consistent comparison
+        if (entryDate >= startDate && entryDate <= endDateInRange) {
+          const month = entryDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+          monthlyTotalsMap[month].sum += entry.co2e_kg;
+          monthlyTotalsMap[month].count += 1;
+        }
       });
 
       console.log('Monthly totals:', monthlyTotalsMap);
