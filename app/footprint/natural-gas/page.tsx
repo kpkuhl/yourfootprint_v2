@@ -27,7 +27,7 @@ ChartJS.register(
 
 type NaturalGasData = {
   id?: string;
-  user_id: string;
+  household_id: string;
   start_date: string;
   end_date: string;
   amount_therm: number;
@@ -83,8 +83,9 @@ function formatDate(dateString: string): string {
 
 export default function NaturalGasPage() {
   const { user } = useAuth();
+  const [householdId, setHouseholdId] = useState<string | null>(null);
   const [naturalGasData, setNaturalGasData] = useState<NaturalGasData>({
-    user_id: '',
+    household_id: '',
     start_date: '',
     end_date: '',
     amount_therm: 0,
@@ -143,14 +144,39 @@ export default function NaturalGasPage() {
 
   // Save form data to localStorage whenever it changes
   useEffect(() => {
-    if (typeof window !== 'undefined' && naturalGasData.user_id) {
+    if (typeof window !== 'undefined' && naturalGasData.household_id) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(naturalGasData));
     }
   }, [naturalGasData]);
 
+  // Fetch household ID for the user
+  useEffect(() => {
+    const fetchHouseholdId = async () => {
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('households')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching household ID:', error);
+        return;
+      }
+
+      if (data) {
+        setHouseholdId(data.id);
+      }
+    };
+
+    fetchHouseholdId();
+  }, [user]);
+
+  // Update fetchData to use household_id
   useEffect(() => {
     const fetchData = async () => {
-      if (!user) return;
+      if (!user || !householdId) return;
       
       const savedData = localStorage.getItem(STORAGE_KEY);
       if (savedData) {
@@ -160,7 +186,7 @@ export default function NaturalGasPage() {
       const { data, error } = await supabase
         .from('natural_gas')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('household_id', householdId)
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
@@ -178,7 +204,7 @@ export default function NaturalGasPage() {
         const today = new Date();
         const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
         setNaturalGasData({
-          user_id: user.id,
+          household_id: householdId,
           start_date: lastMonth.toISOString().split('T')[0],
           end_date: today.toISOString().split('T')[0],
           amount_therm: 0,
@@ -189,16 +215,17 @@ export default function NaturalGasPage() {
     };
 
     fetchData();
-  }, [user]);
+  }, [user, householdId]);
 
+  // Update fetchMonthlyData to use household_id
   useEffect(() => {
     const fetchMonthlyData = async () => {
-      if (!user) return;
+      if (!user || !householdId) return;
 
       const { data, error } = await supabase
         .from('natural_gas')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('household_id', householdId)
         .order('start_date', { ascending: true });
 
       if (error) {
@@ -218,7 +245,7 @@ export default function NaturalGasPage() {
     };
 
     fetchMonthlyData();
-  }, [user]);
+  }, [user, householdId]);
 
   const convertToTherms = (amount: number, fromUnit: string): number => {
     if (fromUnit === 'therms') return amount;
@@ -241,7 +268,7 @@ export default function NaturalGasPage() {
   };
 
   const updateHouseholdNaturalGas = async () => {
-    if (!user) return;
+    if (!user || !householdId) return;
 
     try {
       const twelveMonthsAgo = new Date();
@@ -251,7 +278,7 @@ export default function NaturalGasPage() {
       const { data: recentData, error: fetchError } = await supabase
         .from('natural_gas')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('household_id', householdId)
         .gte('start_date', cutoffDate)
         .order('start_date', { ascending: true });
 
@@ -281,7 +308,7 @@ export default function NaturalGasPage() {
       const { error: updateError } = await supabase
         .from('households')
         .update({ natural_gas: overallAverage })
-        .eq('user_id', user.id);
+        .eq('id', householdId);
 
       if (updateError) throw updateError;
 
@@ -294,7 +321,7 @@ export default function NaturalGasPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || !householdId) return;
 
     try {
       setLoading(true);
@@ -308,7 +335,7 @@ export default function NaturalGasPage() {
       const { error } = await supabase
         .from('natural_gas')
         .insert([{
-          user_id: user.id,
+          household_id: householdId,
           start_date: naturalGasData.start_date,
           end_date: naturalGasData.end_date,
           amount_therm: Number(amount_therm),
@@ -325,7 +352,7 @@ export default function NaturalGasPage() {
       const today = new Date();
       const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
       setNaturalGasData({
-        user_id: user.id,
+        household_id: householdId,
         start_date: lastMonth.toISOString().split('T')[0],
         end_date: today.toISOString().split('T')[0],
         amount_therm: 0,
@@ -403,7 +430,7 @@ export default function NaturalGasPage() {
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !editingId || !editForm) return;
+    if (!user || !householdId || !editingId || !editForm) return;
 
     try {
       const finalCI = Number(inputEditCI);
@@ -428,7 +455,7 @@ export default function NaturalGasPage() {
           CO2e_kg: finalForm.CO2e_kg
         })
         .eq('id', editingId)
-        .eq('user_id', user.id);
+        .eq('household_id', householdId);
 
       if (error) throw error;
 
@@ -458,14 +485,14 @@ export default function NaturalGasPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!user) return;
+    if (!user || !householdId) return;
 
     try {
       const { error } = await supabase
         .from('natural_gas')
         .delete()
         .eq('id', id)
-        .eq('user_id', user.id);
+        .eq('household_id', householdId);
 
       if (error) throw error;
 
