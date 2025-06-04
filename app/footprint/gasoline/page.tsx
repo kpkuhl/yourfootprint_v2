@@ -282,19 +282,16 @@ export default function GasolinePage() {
   // Update handleSubmit to use household_id
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !householdId) return;
+    if (!user || !householdId) {
+      setError('Please sign in to save data');
+      return;
+    }
 
     setLoading(true);
     setError(null);
     setSuccess(null);
 
     try {
-      // Force schema refresh by making a simple query
-      await supabase
-        .from('gasoline')
-        .select('id')
-        .limit(1);
-
       // Calculate gallons from dollars and price per gallon if gallons not provided
       let gallons = gasolineData.gallons;
       if (!gallons && gasolineData.dollars && gasolineData.dollar_gal) {
@@ -322,19 +319,33 @@ export default function GasolinePage() {
         household_id: householdId
       };
 
-      if (isNewEntry) {
-        const { error } = await supabase
-          .from('gasoline')
-          .insert([dataToSubmit]);
+      console.log('Submitting data:', dataToSubmit);
 
-        if (error) throw error;
+      if (isNewEntry) {
+        const { data, error } = await supabase
+          .from('gasoline')
+          .insert([dataToSubmit])
+          .select()
+          .single();
+
+        if (error) {
+          console.error('Error inserting data:', error);
+          throw error;
+        }
+        console.log('Insert successful:', data);
       } else {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('gasoline')
           .update(dataToSubmit)
-          .eq('id', gasolineData.id);
+          .eq('id', gasolineData.id)
+          .select()
+          .single();
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error updating data:', error);
+          throw error;
+        }
+        console.log('Update successful:', data);
       }
 
       await updateHouseholdGasoline();
@@ -350,6 +361,9 @@ export default function GasolinePage() {
         CI_kg_gal: null,
         CO2e_kg: 0
       });
+
+      // Clear localStorage after successful save
+      localStorage.removeItem(STORAGE_KEY);
     } catch (error) {
       console.error('Error saving gasoline data:', error);
       setError(error instanceof Error ? error.message : 'Failed to save gasoline data. Please try again.');
