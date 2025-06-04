@@ -95,7 +95,7 @@ export default function GasolinePage() {
       const { data, error } = await supabase
         .from('households')
         .select('id')
-        .eq('user_id', user.id)
+        .eq('id', user.id)
         .single();
 
       if (error) {
