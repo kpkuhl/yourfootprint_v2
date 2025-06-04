@@ -546,26 +546,20 @@ export default function AirTravelPage() {
 
       if (!householdData) return;
 
-      const twelveMonthsAgo = new Date();
-      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
-      const cutoffDate = twelveMonthsAgo.toISOString().split('T')[0];
-
-      console.log('Fetching air travel data since:', cutoffDate);
-
-      const { data: recentData, error: fetchError } = await supabase
+      // First get all air travel data to find the date range
+      const { data: allData, error: allDataError } = await supabase
         .from('air_travel')
         .select('*')
         .eq('household_id', householdData.id)
-        .gte('leave_date', cutoffDate)
         .order('leave_date', { ascending: true });
 
-      if (fetchError) {
-        console.error('Error fetching air travel data:', fetchError);
-        throw fetchError;
+      if (allDataError) {
+        console.error('Error fetching all air travel data:', allDataError);
+        throw allDataError;
       }
 
-      if (!recentData || recentData.length === 0) {
-        console.log('No air travel data found for the last 12 months');
+      if (!allData || allData.length === 0) {
+        console.log('No air travel data found');
         // Update household with zero emissions
         const { error: updateError } = await supabase
           .from('households')
@@ -580,15 +574,52 @@ export default function AirTravelPage() {
         return;
       }
 
+      // Get the current date and calculate the maximum allowed future date (12 months from now)
+      const currentDate = new Date();
+      const maxFutureDate = new Date(currentDate);
+      maxFutureDate.setMonth(maxFutureDate.getMonth() + 12);
+
+      // Find the farthest future date in the data, but not beyond maxFutureDate
+      const futureDates = allData
+        .map(entry => new Date(entry.leave_date))
+        .filter(date => date > currentDate && date <= maxFutureDate);
+
+      // If we have future dates, use the farthest one; otherwise use current date
+      const endDate = futureDates.length > 0 
+        ? new Date(Math.max(...futureDates.map(d => d.getTime())))
+        : currentDate;
+
+      // Calculate the start date (12 months before the end date)
+      const startDate = new Date(endDate);
+      startDate.setMonth(startDate.getMonth() - 12);
+      const cutoffDate = startDate.toISOString().split('T')[0];
+
+      console.log('End date for calculation:', endDate);
+      console.log('Start date for calculation:', startDate);
+      console.log('Cutoff date:', cutoffDate);
+
+      // Get data for the calculated date range
+      const { data: recentData, error: fetchError } = await supabase
+        .from('air_travel')
+        .select('*')
+        .eq('household_id', householdData.id)
+        .gte('leave_date', cutoffDate)
+        .order('leave_date', { ascending: true });
+
+      if (fetchError) {
+        console.error('Error fetching recent air travel data:', fetchError);
+        throw fetchError;
+      }
+
       console.log('Found air travel data entries:', recentData.length);
 
       // Create a map of all months in the range, initialized with zero emissions
       const monthlyTotalsMap: { [key: string]: { sum: number; count: number } } = {};
-      const currentDate = new Date(twelveMonthsAgo);
-      while (currentDate <= new Date()) {
-        const monthKey = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+      const currentDateInRange = new Date(startDate);
+      while (currentDateInRange <= endDate) {
+        const monthKey = currentDateInRange.toLocaleString('default', { month: 'long', year: 'numeric' });
         monthlyTotalsMap[monthKey] = { sum: 0, count: 0 };
-        currentDate.setMonth(currentDate.getMonth() + 1);
+        currentDateInRange.setMonth(currentDateInRange.getMonth() + 1);
       }
 
       // Sum up emissions for each month that has travel
