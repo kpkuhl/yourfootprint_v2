@@ -263,19 +263,39 @@ export default function GasolinePage() {
 
       console.log('Calculated overall average:', overallAverage);
 
+      // Try to update the record first
       const { error: updateError } = await supabase
-        .from('households')
-        .update({ gasoline: overallAverage })
-        .eq('id', householdId);
+        .from('households_data')
+        .update({ 
+          gasoline: overallAverage,
+          updated_at: new Date().toISOString()
+        })
+        .eq('household_id', householdId);
 
-      if (updateError) {
-        console.error('Error updating household record:', updateError);
+      // If update fails because record doesn't exist, create it
+      if (updateError && updateError.code === 'PGRST116') {
+        const { error: insertError } = await supabase
+          .from('households_data')
+          .insert([{
+            household_id: householdId,
+            gasoline: overallAverage,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }]);
+
+        if (insertError) {
+          console.error('Error creating households_data record:', insertError);
+          throw insertError;
+        }
+      } else if (updateError) {
+        console.error('Error updating households_data record:', updateError);
         throw updateError;
       }
 
-      console.log('Successfully updated household gasoline value:', overallAverage);
+      console.log('Successfully updated household gasoline average:', overallAverage);
     } catch (error) {
       console.error('Error in updateHouseholdGasoline:', error);
+      setError('Failed to update household gasoline average');
     }
   };
 
