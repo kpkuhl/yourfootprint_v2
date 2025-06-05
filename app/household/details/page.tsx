@@ -6,9 +6,9 @@ import Link from 'next/link';
 
 type HouseholdDetails = {
   name: string;
-  members: number;
-  square_feet: number;
-  vehicles: number;
+  num_members: number;
+  sq_ft: number;
+  num_vehicles: number;
   zipcode: string;
 };
 
@@ -16,9 +16,9 @@ export default function HouseholdDetailsPage() {
   const { user } = useAuth();
   const [details, setDetails] = useState<HouseholdDetails>({
     name: '',
-    members: 1,
-    square_feet: 0,
-    vehicles: 0,
+    num_members: 1,
+    sq_ft: 0,
+    num_vehicles: 0,
     zipcode: ''
   });
   const [loading, setLoading] = useState(true);
@@ -52,7 +52,7 @@ export default function HouseholdDetailsPage() {
         // Then get the details from households_data
         const { data, error } = await supabase
           .from('households_data')
-          .select('name, members, square_feet, vehicles, zipcode')
+          .select('name, num_members, sq_ft, num_vehicles, zipcode')
           .eq('household_id', householdData.id)
           .single();
 
@@ -69,9 +69,9 @@ export default function HouseholdDetailsPage() {
           console.log('Setting details from data:', data);
           setDetails({
             name: data.name || '',
-            members: data.members || 1,
-            square_feet: data.square_feet || 0,
-            vehicles: data.vehicles || 0,
+            num_members: data.num_members || 1,
+            sq_ft: data.sq_ft || 0,
+            num_vehicles: data.num_vehicles || 0,
             zipcode: data.zipcode || ''
           });
         } else {
@@ -141,7 +141,7 @@ export default function HouseholdDetailsPage() {
     const { name, value } = e.target;
     setDetails(prev => ({
       ...prev,
-      [name]: name === 'members' || name === 'square_feet' || name === 'vehicles' 
+      [name]: name === 'num_members' || name === 'sq_ft' || name === 'num_vehicles' 
         ? Number(value) 
         : value
     }));
@@ -192,14 +192,14 @@ export default function HouseholdDetailsPage() {
               </div>
 
               <div>
-                <label htmlFor="members" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="num_members" className="block text-sm font-medium text-gray-700">
                   Number of Household Members
                 </label>
                 <input
                   type="number"
-                  id="members"
-                  name="members"
-                  value={details.members}
+                  id="num_members"
+                  name="num_members"
+                  value={details.num_members}
                   onChange={handleChange}
                   min="1"
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
@@ -208,14 +208,14 @@ export default function HouseholdDetailsPage() {
               </div>
 
               <div>
-                <label htmlFor="square_feet" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="sq_ft" className="block text-sm font-medium text-gray-700">
                   Square Footage of Home
                 </label>
                 <input
                   type="number"
-                  id="square_feet"
-                  name="square_feet"
-                  value={details.square_feet}
+                  id="sq_ft"
+                  name="sq_ft"
+                  value={details.sq_ft}
                   onChange={handleChange}
                   min="0"
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
@@ -224,14 +224,14 @@ export default function HouseholdDetailsPage() {
               </div>
 
               <div>
-                <label htmlFor="vehicles" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="num_vehicles" className="block text-sm font-medium text-gray-700">
                   Number of Vehicles
                 </label>
                 <input
                   type="number"
-                  id="vehicles"
-                  name="vehicles"
-                  value={details.vehicles}
+                  id="num_vehicles"
+                  name="num_vehicles"
+                  value={details.num_vehicles}
                   onChange={handleChange}
                   min="0"
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
