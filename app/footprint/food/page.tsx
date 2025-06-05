@@ -104,20 +104,30 @@ export default function FoodPage() {
 
   const uploadImage = async (file: File, foodEntryId: number): Promise<string> => {
     try {
+      if (!householdId) {
+        throw new Error('Household ID is required for image upload');
+      }
+      
       const fileExt = file.name.split('.').pop();
       const fileName = `${foodEntryId}-${Math.random()}.${fileExt}`;
       const filePath = `receipts/${householdId}/${fileName}`;
+
+      console.log('Uploading image to path:', filePath);
 
       const { error: uploadError } = await supabase.storage
         .from('food')
         .upload(filePath, file);
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        throw uploadError;
+      }
 
       const { data: { publicUrl } } = supabase.storage
         .from('food')
         .getPublicUrl(filePath);
 
+      console.log('Image uploaded successfully, URL:', publicUrl);
       return publicUrl;
     } catch (error) {
       console.error('Error uploading image:', error);
@@ -137,6 +147,11 @@ export default function FoodPage() {
     setSuccess(null);
 
     try {
+      console.log('Starting food entry submission...'); // Debug log
+      console.log('Food entry data:', foodEntry); // Debug log
+      console.log('Food details:', foodDetails); // Debug log
+      console.log('Selected file:', selectedFile); // Debug log
+
       // First, create the food entry
       const { data: entryData, error: entryError } = await supabase
         .from('food_entries')
@@ -149,11 +164,17 @@ export default function FoodPage() {
         .select()
         .single();
 
-      if (entryError) throw entryError;
+      if (entryError) {
+        console.error('Error creating food entry:', entryError); // Debug log
+        throw entryError;
+      }
+
+      console.log('Food entry created:', entryData); // Debug log
 
       // If there's an image, upload it
       let imageUrl = null;
       if (selectedFile) {
+        console.log('Uploading image...'); // Debug log
         imageUrl = await uploadImage(selectedFile, entryData.id);
         
         // Update the entry with the image URL
@@ -162,11 +183,16 @@ export default function FoodPage() {
           .update({ image_url: imageUrl })
           .eq('id', entryData.id);
 
-        if (updateError) throw updateError;
+        if (updateError) {
+          console.error('Error updating image URL:', updateError); // Debug log
+          throw updateError;
+        }
       }
 
       // Add food details
       if (foodDetails.length > 0) {
+        console.log('Adding food details:', foodDetails); // Debug log
+        
         const detailsWithEntryId = foodDetails.map(detail => ({
           ...detail,
           food_entry_id: entryData.id,
@@ -174,11 +200,16 @@ export default function FoodPage() {
           date: foodEntry.date
         }));
 
+        console.log('Details with entry ID:', detailsWithEntryId); // Debug log
+
         const { error: detailsError } = await supabase
           .from('food_details')
           .insert(detailsWithEntryId);
 
-        if (detailsError) throw detailsError;
+        if (detailsError) {
+          console.error('Error inserting food details:', detailsError); // Debug log
+          throw detailsError;
+        }
 
         // Calculate total CO2e
         const totalCO2e = foodDetails.reduce((sum, detail) => sum + detail.co2e_kg, 0);
@@ -189,7 +220,10 @@ export default function FoodPage() {
           .update({ co2e: totalCO2e })
           .eq('id', entryData.id);
 
-        if (updateError) throw updateError;
+        if (updateError) {
+          console.error('Error updating CO2e:', updateError); // Debug log
+          throw updateError;
+        }
       }
 
       setSuccess('Food entry saved successfully!');
