@@ -440,6 +440,9 @@ export default function GasolinePage() {
 
       setRawData(prev => prev.filter(entry => entry.id !== id));
       setMonthlyData(prev => prev.filter(entry => entry.id !== id));
+
+      // Update household gasoline average after successful deletion
+      await updateHouseholdGasoline();
     } catch (error) {
       console.error('Error deleting gasoline entry:', error);
       setError('Failed to delete entry. Please try again.');
@@ -508,6 +511,9 @@ export default function GasolinePage() {
             : entry
         )
       );
+
+      // Update household gasoline average after successful edit
+      await updateHouseholdGasoline();
 
       setEditingId(null);
       setEditForm(null);
