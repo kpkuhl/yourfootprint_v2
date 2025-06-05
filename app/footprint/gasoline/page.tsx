@@ -243,23 +243,22 @@ export default function GasolinePage() {
 
       console.log('Found gasoline data entries:', recentData.length);
 
-      const monthlyTotals: { [key: string]: { sum: number; count: number } } = {};
+      // Group data by month and sum CO2e values for each month
+      const monthlyTotals: { [key: string]: number } = {};
       
       recentData.forEach(entry => {
         const month = new Date(entry.date).toLocaleString('default', { month: 'long', year: 'numeric' });
         if (!monthlyTotals[month]) {
-          monthlyTotals[month] = { sum: 0, count: 0 };
+          monthlyTotals[month] = 0;
         }
-        monthlyTotals[month].sum += entry.CO2e_kg;
-        monthlyTotals[month].count += 1;
+        monthlyTotals[month] += entry.CO2e_kg;
       });
 
       console.log('Monthly totals:', monthlyTotals);
 
-      const monthlyAverages = Object.values(monthlyTotals).map(
-        ({ sum, count }) => sum / count
-      );
-      const overallAverage = monthlyAverages.reduce((a, b) => a + b, 0) / monthlyAverages.length;
+      // Calculate average of monthly totals
+      const monthlyValues = Object.values(monthlyTotals);
+      const overallAverage = monthlyValues.reduce((a, b) => a + b, 0) / monthlyValues.length;
 
       console.log('Calculated overall average:', overallAverage);
 
