@@ -312,11 +312,13 @@ export default function GasolinePage() {
       const CO2e_kg = calculateCO2e(gallons, CI_kg_gal);
 
       const dataToSubmit = {
-        ...gasolineData,
+        household_id: householdId,
+        date: gasolineData.date,
+        dollars: gasolineData.dollars,
+        dollar_gal: gasolineData.dollar_gal,
         gallons,
         CI_kg_gal,
-        CO2e_kg,
-        household_id: householdId
+        CO2e_kg
       };
 
       console.log('Submitting data:', dataToSubmit);
