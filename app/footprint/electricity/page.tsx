@@ -282,7 +282,7 @@ export default function ElectricityPage() {
 
   // Function to update households table with average monthly CO2e
   const updateHouseholdElectricity = async () => {
-    if (!user) return;
+    if (!user || !householdId) return;
 
     try {
       // Get the last 12 months of data
@@ -323,13 +323,48 @@ export default function ElectricityPage() {
       );
       const overallAverage = monthlyAverages.reduce((a, b) => a + b, 0) / monthlyAverages.length;
 
-      // Update households table
-      const { error: updateError } = await supabase
-        .from('households')
-        .update({ electricity: overallAverage })
-        .eq('id', householdId);
+      // First check if a households_data record exists
+      const { data: existingData, error: fetchDataError } = await supabase
+        .from('households_data')
+        .select('id')
+        .eq('household_id', householdId)
+        .single();
 
-      if (updateError) throw updateError;
+      if (fetchDataError && fetchDataError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+        console.error('Error checking for existing households_data:', fetchDataError);
+        throw fetchDataError;
+      }
+
+      if (existingData) {
+        // Update existing record
+        const { error: updateError } = await supabase
+          .from('households_data')
+          .update({ 
+            electricity: overallAverage,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingData.id);
+
+        if (updateError) {
+          console.error('Error updating households_data record:', updateError);
+          throw updateError;
+        }
+      } else {
+        // Create new record
+        const { error: insertError } = await supabase
+          .from('households_data')
+          .insert([{
+            household_id: householdId,
+            electricity: overallAverage,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }]);
+
+        if (insertError) {
+          console.error('Error creating households_data record:', insertError);
+          throw insertError;
+        }
+      }
 
       console.log('Successfully updated household electricity average:', overallAverage);
     } catch (error) {
