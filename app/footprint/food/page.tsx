@@ -65,12 +65,29 @@ export default function FoodPage() {
       }
 
       if (data) {
+        console.log('Setting household ID:', data.id); // Debug log
         setHouseholdId(data.id);
+        // Update foodEntry with the household ID
+        setFoodEntry(prev => ({
+          ...prev,
+          household_id: data.id
+        }));
       }
     };
 
     fetchHouseholdId();
   }, [user]);
+
+  // Update foodEntry when householdId changes
+  useEffect(() => {
+    if (householdId) {
+      console.log('Updating foodEntry with household ID:', householdId); // Debug log
+      setFoodEntry(prev => ({
+        ...prev,
+        household_id: householdId
+      }));
+    }
+  }, [householdId]);
 
   // Fetch food entries for the household
   useEffect(() => {
@@ -256,8 +273,13 @@ export default function FoodPage() {
   };
 
   const addFoodDetail = () => {
+    if (!householdId) {
+      console.error('Cannot add food detail: household ID is missing'); // Debug log
+      return;
+    }
+    
     setFoodDetails(prev => [...prev, {
-      household_id: householdId || '',
+      household_id: householdId,
       date: foodEntry.date,
       item: '',
       category: null,
