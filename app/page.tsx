@@ -31,28 +31,42 @@ export default function Home() {
       if (!user) return;
 
       try {
-        // First, fetch the average US household data
-        const { data: averageData, error: averageError } = await supabase
-          .from('households')
-          .select('*')
-          .eq('name', 'average us')
-          .single();
+        setLoading(true);
+        setError(null);
 
-        if (averageError) {
-          console.error('Error fetching average household data:', averageError);
-          throw averageError;
-        }
-
-        // Then fetch the user's household data
-        const { data: userData, error: userError } = await supabase
+        // First get the household ID for this user
+        const { data: householdData, error: householdError } = await supabase
           .from('households')
-          .select('*')
+          .select('id')
           .eq('user_id', user.id)
           .single();
-        
-        if (userError && userError.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
-          console.error('Error fetching user household:', userError);
-          throw userError;
+
+        if (householdError) {
+          console.error('Error fetching household ID:', householdError);
+          throw householdError;
+        }
+
+        if (!householdData) {
+          throw new Error('No household found for this user');
+        }
+
+        // Get both the user's household data and the average US data
+        const { data: allData, error: dataError } = await supabase
+          .from('households_data')
+          .select('*')
+          .in('household_id', [householdData.id, 'average us']);
+
+        if (dataError) {
+          console.error('Error fetching footprint data:', dataError);
+          throw dataError;
+        }
+
+        // Separate user data and average US data
+        const userData = allData?.find(d => d.household_id === householdData.id);
+        const averageData = allData?.find(d => d.household_id === 'average us');
+
+        if (!averageData) {
+          console.warn('Average US household data not found');
         }
 
         // Store user data for label comparison
@@ -60,13 +74,13 @@ export default function Home() {
 
         // Merge user data with average data, using user data when available
         setFootprintData({
-          electricity: userData?.electricity || averageData.electricity,
-          natural_gas: userData?.natural_gas || averageData.natural_gas,
-          water: userData?.water || averageData.water,
-          gasoline: userData?.gasoline || averageData.gasoline,
-          air_travel: userData?.air_travel || averageData.air_travel,
-          food: userData?.food || averageData.food,
-          stuff: userData?.stuff || averageData.stuff
+          electricity: userData?.electricity || averageData?.electricity || 0,
+          natural_gas: userData?.natural_gas || averageData?.natural_gas || 0,
+          water: userData?.water || averageData?.water || 0,
+          gasoline: userData?.gasoline || averageData?.gasoline || 0,
+          air_travel: userData?.air_travel || averageData?.air_travel || 0,
+          food: userData?.food || averageData?.food || 0,
+          stuff: userData?.stuff || averageData?.stuff || 0
         });
       } catch (error) {
         console.error('Error in fetchHouseholdData:', error);
