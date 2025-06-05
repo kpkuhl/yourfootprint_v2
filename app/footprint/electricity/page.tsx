@@ -323,34 +323,17 @@ export default function ElectricityPage() {
       );
       const overallAverage = monthlyAverages.reduce((a, b) => a + b, 0) / monthlyAverages.length;
 
-      // First check if a households_data record exists
-      const { data: existingData, error: fetchDataError } = await supabase
+      // Try to update the record first
+      const { error: updateError } = await supabase
         .from('households_data')
-        .select('id')
-        .eq('household_id', householdId)
-        .single();
+        .update({ 
+          electricity: overallAverage,
+          updated_at: new Date().toISOString()
+        })
+        .eq('household_id', householdId);
 
-      if (fetchDataError && fetchDataError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
-        console.error('Error checking for existing households_data:', fetchDataError);
-        throw fetchDataError;
-      }
-
-      if (existingData) {
-        // Update existing record
-        const { error: updateError } = await supabase
-          .from('households_data')
-          .update({ 
-            electricity: overallAverage,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', existingData.id);
-
-        if (updateError) {
-          console.error('Error updating households_data record:', updateError);
-          throw updateError;
-        }
-      } else {
-        // Create new record
+      // If update fails because record doesn't exist, create it
+      if (updateError && updateError.code === 'PGRST116') {
         const { error: insertError } = await supabase
           .from('households_data')
           .insert([{
@@ -364,6 +347,9 @@ export default function ElectricityPage() {
           console.error('Error creating households_data record:', insertError);
           throw insertError;
         }
+      } else if (updateError) {
+        console.error('Error updating households_data record:', updateError);
+        throw updateError;
       }
 
       console.log('Successfully updated household electricity average:', overallAverage);
