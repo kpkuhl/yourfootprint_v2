@@ -47,8 +47,10 @@ export default function HouseholdDetailsPage() {
           .eq('household_id', householdData.id)
           .single();
 
-        if (error && error.code !== 'PGRST116') throw error; // PGRST116 is "no rows returned" error
+        // If there's an error other than "no rows returned", throw it
+        if (error && error.code !== 'PGRST116') throw error;
         
+        // If we have data, use it. Otherwise, keep the default values
         if (data) {
           setDetails({
             name: data.name || '',
@@ -58,6 +60,7 @@ export default function HouseholdDetailsPage() {
             zipcode: data.zipcode || ''
           });
         }
+        // If no data exists, we'll keep the default values
       } catch (error) {
         console.error('Error fetching household details:', error);
         setError('Failed to load household details');
