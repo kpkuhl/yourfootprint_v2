@@ -30,6 +30,7 @@ export default function HouseholdDetailsPage() {
       if (!user) return;
 
       try {
+        console.log('Fetching household ID for user:', user.id);
         // First get the household ID
         const { data: householdData, error: householdError } = await supabase
           .from('households')
@@ -37,8 +38,16 @@ export default function HouseholdDetailsPage() {
           .eq('user_id', user.id)
           .single();
 
-        if (householdError) throw householdError;
-        if (!householdData) throw new Error('No household found');
+        if (householdError) {
+          console.error('Error fetching household ID:', householdError);
+          throw householdError;
+        }
+        if (!householdData) {
+          console.error('No household found for user:', user.id);
+          throw new Error('No household found');
+        }
+
+        console.log('Found household ID:', householdData.id);
 
         // Then get the details from households_data
         const { data, error } = await supabase
@@ -47,11 +56,17 @@ export default function HouseholdDetailsPage() {
           .eq('household_id', householdData.id)
           .single();
 
+        console.log('Households data response:', { data, error });
+
         // If there's an error other than "no rows returned", throw it
-        if (error && error.code !== 'PGRST116') throw error;
+        if (error && error.code !== 'PGRST116') {
+          console.error('Error fetching households_data:', error);
+          throw error;
+        }
         
         // If we have data, use it. Otherwise, keep the default values
         if (data) {
+          console.log('Setting details from data:', data);
           setDetails({
             name: data.name || '',
             members: data.members || 1,
@@ -59,10 +74,11 @@ export default function HouseholdDetailsPage() {
             vehicles: data.vehicles || 0,
             zipcode: data.zipcode || ''
           });
+        } else {
+          console.log('No data found in households_data, using default values');
         }
-        // If no data exists, we'll keep the default values
       } catch (error) {
-        console.error('Error fetching household details:', error);
+        console.error('Error in fetchData:', error);
         setError('Failed to load household details');
       } finally {
         setLoading(false);
