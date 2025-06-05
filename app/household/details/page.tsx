@@ -30,13 +30,25 @@ export default function HouseholdDetailsPage() {
       if (!user) return;
 
       try {
-        const { data, error } = await supabase
+        // First get the household ID
+        const { data: householdData, error: householdError } = await supabase
           .from('households')
-          .select('name, members, square_feet, vehicles, zipcode')
+          .select('id')
           .eq('user_id', user.id)
           .single();
 
-        if (error) throw error;
+        if (householdError) throw householdError;
+        if (!householdData) throw new Error('No household found');
+
+        // Then get the details from households_data
+        const { data, error } = await supabase
+          .from('households_data')
+          .select('name, members, square_feet, vehicles, zipcode')
+          .eq('household_id', householdData.id)
+          .single();
+
+        if (error && error.code !== 'PGRST116') throw error; // PGRST116 is "no rows returned" error
+        
         if (data) {
           setDetails({
             name: data.name || '',
@@ -62,14 +74,42 @@ export default function HouseholdDetailsPage() {
     if (!user) return;
 
     try {
-      const { error } = await supabase
+      // First get the household ID
+      const { data: householdData, error: householdError } = await supabase
         .from('households')
-        .upsert({
-          user_id: user.id,
-          ...details
-        });
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
 
-      if (error) throw error;
+      if (householdError) throw householdError;
+      if (!householdData) throw new Error('No household found');
+
+      // Try to update the record first
+      const { error: updateError } = await supabase
+        .from('households_data')
+        .update({
+          household_id: householdData.id,
+          ...details,
+          updated_at: new Date().toISOString()
+        })
+        .eq('household_id', householdData.id);
+
+      // If update fails because record doesn't exist, create it
+      if (updateError && updateError.code === 'PGRST116') {
+        const { error: insertError } = await supabase
+          .from('households_data')
+          .insert([{
+            household_id: householdData.id,
+            ...details,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }]);
+
+        if (insertError) throw insertError;
+      } else if (updateError) {
+        throw updateError;
+      }
+
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (error) {
