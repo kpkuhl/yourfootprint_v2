@@ -50,23 +50,28 @@ export default function Home() {
           throw new Error('No household found for this user');
         }
 
-        // Get both the user's household data and the average US data
-        const { data: allData, error: dataError } = await supabase
+        // Get user's household data
+        const { data: userData, error: userDataError } = await supabase
           .from('households_data')
           .select('*')
-          .in('household_id', [householdData.id, 'average us']);
+          .eq('household_id', householdData.id)
+          .single();
 
-        if (dataError) {
-          console.error('Error fetching footprint data:', dataError);
-          throw dataError;
+        if (userDataError && userDataError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+          console.error('Error fetching user footprint data:', userDataError);
+          throw userDataError;
         }
 
-        // Separate user data and average US data
-        const userData = allData?.find(d => d.household_id === householdData.id);
-        const averageData = allData?.find(d => d.household_id === 'average us');
+        // Get average US data
+        const { data: averageData, error: averageDataError } = await supabase
+          .from('households_data')
+          .select('*')
+          .eq('name', 'average us')
+          .single();
 
-        if (!averageData) {
-          console.warn('Average US household data not found');
+        if (averageDataError && averageDataError.code !== 'PGRST116') {
+          console.error('Error fetching average US data:', averageDataError);
+          throw averageDataError;
         }
 
         // Store user data for label comparison
