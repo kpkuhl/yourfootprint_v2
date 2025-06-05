@@ -673,6 +673,14 @@ export default function AirTravelPage() {
       setNumberOfMonths(numberOfMonthsValue);
       setOverallAverage(overallAverageValue);
 
+      // Update monthlyData for the chart
+      const monthlyValues = Object.entries(monthlyTotalsMap).map(([month, data]) => ({
+        id: month,
+        month,
+        CO2e: data.sum
+      }));
+      setMonthlyData(monthlyValues);
+
       // Try to update the record first
       const { error: updateError } = await supabase
         .from('households_data')
