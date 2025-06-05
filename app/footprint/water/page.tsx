@@ -269,10 +269,12 @@ export default function WaterPage() {
     if (!user || !householdId) return;
 
     try {
+      // Get the last 12 months of data
       const twelveMonthsAgo = new Date();
       twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
       const cutoffDate = twelveMonthsAgo.toISOString().split('T')[0];
 
+      // Fetch water data for the last 12 months
       const { data: recentData, error: fetchError } = await supabase
         .from('water')
         .select('*')
@@ -287,6 +289,7 @@ export default function WaterPage() {
         return;
       }
 
+      // Calculate monthly averages
       const monthlyTotals: { [key: string]: { sum: number; count: number } } = {};
       
       recentData.forEach(entry => {
@@ -298,17 +301,54 @@ export default function WaterPage() {
         monthlyTotals[month].count += 1;
       });
 
+      // Calculate overall average
       const monthlyAverages = Object.values(monthlyTotals).map(
         ({ sum, count }) => sum / count
       );
       const overallAverage = monthlyAverages.reduce((a, b) => a + b, 0) / monthlyAverages.length;
 
-      const { error: updateError } = await supabase
-        .from('households')
-        .update({ water: overallAverage })
-        .eq('id', householdId);
+      // First check if a households_data record exists
+      const { data: existingData, error: fetchDataError } = await supabase
+        .from('households_data')
+        .select('id')
+        .eq('household_id', householdId)
+        .single();
 
-      if (updateError) throw updateError;
+      if (fetchDataError && fetchDataError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+        console.error('Error checking for existing households_data:', fetchDataError);
+        throw fetchDataError;
+      }
+
+      if (existingData) {
+        // Update existing record
+        const { error: updateError } = await supabase
+          .from('households_data')
+          .update({ 
+            water: overallAverage,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingData.id);
+
+        if (updateError) {
+          console.error('Error updating households_data record:', updateError);
+          throw updateError;
+        }
+      } else {
+        // Create new record
+        const { error: insertError } = await supabase
+          .from('households_data')
+          .insert([{
+            household_id: householdId,
+            water: overallAverage,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }]);
+
+        if (insertError) {
+          console.error('Error creating households_data record:', insertError);
+          throw insertError;
+        }
+      }
 
       console.log('Successfully updated household water average:', overallAverage);
     } catch (error) {
