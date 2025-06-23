@@ -142,6 +142,13 @@ export default function FoodPage() {
         return;
       }
 
+      console.log('=== FETCHED CI DATA ===');
+      console.log('Raw data from database:', data);
+      console.log('Number of records:', data?.length);
+      if (data && data.length > 0) {
+        console.log('First record:', data[0]);
+        console.log('All categories:', data.map(ci => `"${ci.categories}"`));
+      }
       setDefaultCIValues(data || []);
     };
 
@@ -150,22 +157,36 @@ export default function FoodPage() {
 
   // Function to get carbon intensity for a food item
   const getCarbonIntensity = (category: string | null, customCI: number | null): number => {
+    console.log('=== GETTING CARBON INTENSITY ===');
+    console.log('Input category:', `"${category}"`);
+    console.log('Custom CI:', customCI);
+    console.log('Available categories in state:', defaultCIValues.map(ci => `"${ci.categories}"`));
+    
     // If custom CI is provided, use it
     if (customCI !== null) {
+      console.log('Using custom CI:', customCI);
       return customCI;
     }
 
     // If no category, use a default value
     if (!category) {
+      console.log('No category provided, using default 2.0');
       return 2.0; // Default moderate carbon intensity
     }
 
     // Find the default CI for the category with more robust matching
-    const defaultCI = defaultCIValues.find(ci => 
-      ci.categories.trim().toLowerCase() === category.trim().toLowerCase()
-    );
+    const defaultCI = defaultCIValues.find(ci => {
+      const dbCategory = ci.categories.trim().toLowerCase();
+      const inputCategory = category.trim().toLowerCase();
+      const matches = dbCategory === inputCategory;
+      console.log(`Comparing: "${ci.categories}" (${dbCategory}) vs "${category}" (${inputCategory}) = ${matches}`);
+      return matches;
+    });
     
-    return defaultCI ? defaultCI.CI_kg_kg : 2.0; // Fallback to moderate default
+    console.log('Found default CI:', defaultCI);
+    const result = defaultCI ? defaultCI.CI_kg_kg : 2.0;
+    console.log('Final result:', result);
+    return result;
   };
 
   // Function to calculate CO2e for a food item
@@ -1146,6 +1167,34 @@ export default function FoodPage() {
                     <p className="text-sm text-blue-600 mt-1">
                       Combined carbon footprint of all {foodDetails.length} food item{foodDetails.length !== 1 ? 's' : ''}
                     </p>
+                  </div>
+                )}
+
+                {/* Debug section to show available categories */}
+                {defaultCIValues.length > 0 && (
+                  <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                    <h3 className="text-sm font-semibold text-yellow-800 mb-2">Debug: Available Categories from Database</h3>
+                    <div className="text-xs text-yellow-700">
+                      {defaultCIValues.map((ci, index) => (
+                        <div key={index}>
+                          "{ci.categories}": {ci.CI_kg_kg} kg CO2e/kg
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        console.log('=== TESTING CARBON INTENSITY ===');
+                        const testCategories = ['Beef', 'Produce', 'Cheese'];
+                        testCategories.forEach(cat => {
+                          const ci = getCarbonIntensity(cat, null);
+                          console.log(`Test ${cat}: ${ci} kg CO2e/kg`);
+                        });
+                      }}
+                      className="mt-2 px-3 py-1 bg-yellow-600 text-white text-xs rounded hover:bg-yellow-700"
+                    >
+                      Test Carbon Intensity
+                    </button>
                   </div>
                 )}
 
