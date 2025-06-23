@@ -633,13 +633,26 @@ export default function FoodPage() {
                                 <div className="text-sm text-gray-600">Price: {item.price}</div>
                               )}
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => addExtractedItem(item)}
-                              className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm ml-2"
-                            >
-                              Add
-                            </button>
+                            <div className="flex space-x-2 ml-2">
+                              <button
+                                type="button"
+                                onClick={() => addExtractedItem(item)}
+                                className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
+                              >
+                                Add
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newItems = [...extractedItems];
+                                  newItems.splice(index, 1);
+                                  setExtractedItems(newItems);
+                                }}
+                                className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+                              >
+                                Remove
+                              </button>
+                            </div>
                           </div>
                           
                           {/* Quantity and Category Selection */}
