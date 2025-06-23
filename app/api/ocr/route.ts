@@ -246,7 +246,8 @@ function parseReceiptText(text: string): Array<{
     console.log(`Looking for prices in line: "${trimmedLine}"`);
     
     // First, try to find price at the end of the line (most common in receipts)
-    const endPriceMatch = trimmedLine.match(/(\$?\d+\.\d{2})\s*$/);
+    // Handle both formats: $1.23 and $ 1.23 (with space after dollar sign)
+    const endPriceMatch = trimmedLine.match(/(\$?\s*\d+\.\d{2})\s*$/);
     if (endPriceMatch) {
       price = endPriceMatch[1];
       console.log(`Found end price: "${price}" in line: "${trimmedLine}"`);
@@ -255,7 +256,8 @@ function parseReceiptText(text: string): Array<{
       
       // Look for prices that are clearly separated from item names
       // This pattern looks for prices that come after some text and are separated by spaces
-      const separatedPriceMatch = trimmedLine.match(/([A-Za-z\s]+)\s+(\$?\d+\.\d{2})/);
+      // Handle both formats: $1.23 and $ 1.23
+      const separatedPriceMatch = trimmedLine.match(/([A-Za-z\s]+)\s+(\$?\s*\d+\.\d{2})/);
       if (separatedPriceMatch) {
         price = separatedPriceMatch[2];
         console.log(`Found separated price: "${price}" in line: "${trimmedLine}"`);
@@ -264,7 +266,8 @@ function parseReceiptText(text: string): Array<{
         
         // More flexible approach: find any price pattern in the line
         // but prioritize prices that appear after some text
-        const allPriceMatches = trimmedLine.match(/(\$?\d+\.\d{2})/g);
+        // Handle both formats: $1.23 and $ 1.23
+        const allPriceMatches = trimmedLine.match(/(\$?\s*\d+\.\d{2})/g);
         console.log(`All price matches found:`, allPriceMatches);
         
         if (allPriceMatches && allPriceMatches.length > 0) {
@@ -276,7 +279,8 @@ function parseReceiptText(text: string): Array<{
           
           // Fall back to finding any price in the line, but be more careful
           // Look for prices that are at least 3 characters from the start (to avoid item codes)
-          const priceMatch = trimmedLine.match(/(\$?\d+\.\d{2})/);
+          // Handle both formats: $1.23 and $ 1.23
+          const priceMatch = trimmedLine.match(/(\$?\s*\d+\.\d{2})/);
           if (priceMatch) {
             const priceIndex = trimmedLine.indexOf(priceMatch[0]);
             // Only use this price if it's not at the very beginning (likely an item code)
@@ -295,8 +299,8 @@ function parseReceiptText(text: string): Array<{
 
     // Format price to ensure it has a dollar sign
     if (price) {
-      // Remove any existing dollar sign and add it back
-      const numericPrice = price.replace('$', '');
+      // Remove any existing dollar sign and spaces, then add it back
+      const numericPrice = price.replace(/^\$\s*/, '').replace(/\s+/g, '');
       price = `$${numericPrice}`;
       console.log(`Formatted price: "${price}"`);
     }
@@ -331,10 +335,22 @@ function parseReceiptText(text: string): Array<{
 
     // For items with text between name and price, take only the first meaningful word/phrase
     // This handles cases like "BANANA ORGANIC 2.99" -> "BANANA"
+    // But also handle cases like "QUAKER OATS" -> "QUAKER"
     const firstWordMatch = itemName.match(/^([A-Za-z]+)/);
     if (firstWordMatch && firstWordMatch[1].length >= 3) {
-      itemName = firstWordMatch[1];
-      console.log(`Extracted first word as item name: "${itemName}" from "${trimmedLine}"`);
+      // Don't override if the item name is already a good food item
+      const lowerName = itemName.toLowerCase();
+      const isFoodItem = lowerName.includes('quaker') || lowerName.includes('lipton') || 
+                        lowerName.includes('morningstar') || lowerName.includes('maruchan') ||
+                        lowerName.includes('dots') || lowerName.includes('mae') ||
+                        lowerName.includes('huy') || lowerName.includes('sporting') ||
+                        lowerName.includes('igloo') || lowerName.includes('stationery') ||
+                        lowerName.includes('pens') || lowerName.includes('reusable');
+      
+      if (!isFoodItem) {
+        itemName = firstWordMatch[1];
+        console.log(`Extracted first word as item name: "${itemName}" from "${trimmedLine}"`);
+      }
     }
 
     // Skip lines that are mostly numbers or codes
