@@ -235,14 +235,32 @@ function parseReceiptText(text: string): Array<{
       continue;
     }
 
-    // Extract price using multiple patterns
+    // Extract price - prioritize prices at the end of the line
     let price: string | undefined;
-    for (const pattern of pricePatterns) {
-      const priceMatch = trimmedLine.match(pattern);
-      if (priceMatch) {
-        price = priceMatch[0];
-        break;
+    
+    // First, try to find price at the end of the line (most common in receipts)
+    const endPriceMatch = trimmedLine.match(/(\$?\d+\.\d{2})\s*$/);
+    if (endPriceMatch) {
+      price = endPriceMatch[1];
+      console.log(`Found end price: "${price}" in line: "${trimmedLine}"`);
+    } else {
+      // Fall back to finding any price in the line
+      for (const pattern of pricePatterns) {
+        const priceMatch = trimmedLine.match(pattern);
+        if (priceMatch) {
+          price = priceMatch[0];
+          console.log(`Found price with pattern: "${price}" in line: "${trimmedLine}"`);
+          break;
+        }
       }
+    }
+
+    // Format price to ensure it has a dollar sign
+    if (price) {
+      // Remove any existing dollar sign and add it back
+      const numericPrice = price.replace('$', '');
+      price = `$${numericPrice}`;
+      console.log(`Formatted price: "${price}"`);
     }
 
     // Extract quantity using multiple patterns
