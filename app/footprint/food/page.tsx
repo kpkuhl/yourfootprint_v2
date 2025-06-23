@@ -53,6 +53,7 @@ export default function FoodPage() {
     price?: string;
     quantity?: string;
     category?: string;
+    packaging?: string;
   }>>([]);
 
   // Fetch household ID for the user
@@ -471,13 +472,14 @@ export default function FoodPage() {
     price?: string;
     quantity?: string;
     category?: string;
+    packaging?: string;
   }) => {
     setFoodDetails(prev => [...prev, {
       household_id: householdId || '',
       date: foodEntry.date,
       item: extractedItem.item,
       category: extractedItem.category || null,
-      packaged: false,
+      packaged: extractedItem.packaging && extractedItem.packaging !== 'none',
       CI_custom: null,
       co2e_kg: 0,
       food_entry_id: 0
@@ -493,7 +495,7 @@ export default function FoodPage() {
       date: foodEntry.date,
       item: extractedItem.item,
       category: extractedItem.category || null,
-      packaged: false,
+      packaged: extractedItem.packaging && extractedItem.packaging !== 'none',
       CI_custom: null,
       co2e_kg: 0,
       food_entry_id: 0
@@ -638,7 +640,7 @@ export default function FoodPage() {
                           </div>
                           
                           {/* Quantity and Category Selection */}
-                          <div className="grid grid-cols-2 gap-3 mt-2">
+                          <div className="grid grid-cols-3 gap-3 mt-2">
                             <div>
                               <label className="block text-xs font-medium text-gray-700 mb-1">
                                 Quantity
@@ -684,6 +686,33 @@ export default function FoodPage() {
                                 <option value="grains">Grains</option>
                                 <option value="processed">Processed Food</option>
                                 <option value="other">Other</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">
+                                Packaging
+                              </label>
+                              <select
+                                value={item.packaging || ''}
+                                onChange={(e) => {
+                                  const newItems = [...extractedItems];
+                                  newItems[index] = {
+                                    ...newItems[index],
+                                    packaging: e.target.value
+                                  };
+                                  setExtractedItems(newItems);
+                                }}
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                              >
+                                <option value="">Select packaging</option>
+                                <option value="none">None</option>
+                                <option value="glass">Glass</option>
+                                <option value="plastic">Plastic</option>
+                                <option value="steel">Steel</option>
+                                <option value="aluminum">Aluminum</option>
+                                <option value="paper">Paper</option>
+                                <option value="wood">Wood</option>
                               </select>
                             </div>
                           </div>
@@ -738,17 +767,23 @@ export default function FoodPage() {
                         </select>
                       </div>
 
-                      <div className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id={`packaged-${index}`}
-                          checked={detail.packaged}
-                          onChange={(e) => updateFoodDetail(index, 'packaged', e.target.checked)}
-                          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                        />
-                        <label htmlFor={`packaged-${index}`} className="ml-2 block text-sm text-gray-900">
-                          Packaged Item
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Packaging
                         </label>
+                        <select
+                          value={detail.packaged ? 'plastic' : 'none'}
+                          onChange={(e) => updateFoodDetail(index, 'packaged', e.target.value !== 'none')}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        >
+                          <option value="none">None</option>
+                          <option value="glass">Glass</option>
+                          <option value="plastic">Plastic</option>
+                          <option value="steel">Steel</option>
+                          <option value="aluminum">Aluminum</option>
+                          <option value="paper">Paper</option>
+                          <option value="wood">Wood</option>
+                        </select>
                       </div>
 
                       <div>
