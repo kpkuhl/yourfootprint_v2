@@ -12,18 +12,24 @@ try {
     keyFilePath: process.env.GOOGLE_CLOUD_KEY_FILE,
   });
 
-  // Try to use service account key file first
-  if (process.env.GOOGLE_CLOUD_KEY_FILE) {
+  // Try to use direct credentials first (better for Vercel)
+  if (process.env.GOOGLE_CLOUD_CREDENTIALS) {
+    console.log('Using direct credentials from environment variable');
+    try {
+      const credentials = JSON.parse(process.env.GOOGLE_CLOUD_CREDENTIALS);
+      client = new ImageAnnotatorClient({
+        credentials: credentials,
+      });
+    } catch (parseError) {
+      console.error('Failed to parse GOOGLE_CLOUD_CREDENTIALS:', parseError);
+      throw new Error('Invalid GOOGLE_CLOUD_CREDENTIALS format');
+    }
+  } 
+  // Fall back to service account key file
+  else if (process.env.GOOGLE_CLOUD_KEY_FILE) {
     console.log('Using service account key file:', process.env.GOOGLE_CLOUD_KEY_FILE);
     client = new ImageAnnotatorClient({
       keyFilename: process.env.GOOGLE_CLOUD_KEY_FILE,
-    });
-  } 
-  // Fall back to direct credentials
-  else if (process.env.GOOGLE_CLOUD_CREDENTIALS) {
-    console.log('Using direct credentials from environment variable');
-    client = new ImageAnnotatorClient({
-      credentials: JSON.parse(process.env.GOOGLE_CLOUD_CREDENTIALS),
     });
   } 
   // Fall back to default credentials (if running on Google Cloud)
