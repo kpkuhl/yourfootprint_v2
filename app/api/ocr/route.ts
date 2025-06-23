@@ -45,6 +45,8 @@ try {
 }
 
 export async function POST(request: NextRequest) {
+  console.log('OCR API route called');
+  
   try {
     if (!client) {
       console.error('Google Cloud Vision client not initialized');
@@ -55,6 +57,11 @@ export async function POST(request: NextRequest) {
     }
 
     const { imageUrl, imageData, imageType } = await request.json();
+    console.log('Request received with:', { 
+      hasImageData: !!imageData, 
+      hasImageUrl: !!imageUrl, 
+      imageType 
+    });
 
     if (!imageData && !imageUrl) {
       console.error('No image data or URL provided');

@@ -348,6 +348,15 @@ export default function FoodPage() {
     
     try {
       console.log('Converting file to base64 for OCR processing...');
+      console.log('File size before processing:', file.size, 'bytes');
+      
+      // Check file size (Google Cloud Vision has a 10MB limit)
+      const maxSize = 10 * 1024 * 1024; // 10MB
+      if (file.size > maxSize) {
+        setError('Image file is too large. Please use an image smaller than 10MB.');
+        setProcessingOCR(false);
+        return;
+      }
       
       // Convert file to base64
       const base64 = await new Promise<string>((resolve, reject) => {
@@ -370,7 +379,13 @@ export default function FoodPage() {
 
       console.log('Sending OCR request with base64 image data...');
       
-      const response = await fetch('/api/ocr', {
+      // Create a timeout promise
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('OCR request timed out after 30 seconds')), 30000);
+      });
+      
+      // Create the fetch promise
+      const fetchPromise = fetch('/api/ocr', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -380,6 +395,9 @@ export default function FoodPage() {
           imageType: file.type 
         }),
       });
+
+      // Race between fetch and timeout
+      const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
 
       console.log('OCR API response status:', response.status);
       
