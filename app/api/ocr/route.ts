@@ -5,30 +5,43 @@ import { ImageAnnotatorClient } from '@google-cloud/vision';
 let client: ImageAnnotatorClient;
 
 try {
+  console.log('Initializing Google Cloud Vision client...');
+  console.log('Available environment variables:', {
+    hasKeyFile: !!process.env.GOOGLE_CLOUD_KEY_FILE,
+    hasCredentials: !!process.env.GOOGLE_CLOUD_CREDENTIALS,
+    keyFilePath: process.env.GOOGLE_CLOUD_KEY_FILE,
+  });
+
   // Try to use service account key file first
   if (process.env.GOOGLE_CLOUD_KEY_FILE) {
+    console.log('Using service account key file:', process.env.GOOGLE_CLOUD_KEY_FILE);
     client = new ImageAnnotatorClient({
       keyFilename: process.env.GOOGLE_CLOUD_KEY_FILE,
     });
   } 
   // Fall back to direct credentials
   else if (process.env.GOOGLE_CLOUD_CREDENTIALS) {
+    console.log('Using direct credentials from environment variable');
     client = new ImageAnnotatorClient({
       credentials: JSON.parse(process.env.GOOGLE_CLOUD_CREDENTIALS),
     });
   } 
   // Fall back to default credentials (if running on Google Cloud)
   else {
+    console.log('Using default credentials');
     client = new ImageAnnotatorClient();
   }
+  console.log('Google Cloud Vision client initialized successfully');
 } catch (error) {
   console.error('Failed to initialize Google Cloud Vision client:', error);
+  console.error('Error details:', error instanceof Error ? error.message : 'Unknown error');
   client = null as any;
 }
 
 export async function POST(request: NextRequest) {
   try {
     if (!client) {
+      console.error('Google Cloud Vision client not initialized');
       return NextResponse.json(
         { error: 'Google Cloud Vision not configured. Please set up credentials.' },
         { status: 500 }
@@ -38,16 +51,28 @@ export async function POST(request: NextRequest) {
     const { imageUrl } = await request.json();
 
     if (!imageUrl) {
+      console.error('No image URL provided');
       return NextResponse.json({ error: 'Image URL is required' }, { status: 400 });
     }
 
     console.log('Processing OCR for image:', imageUrl);
 
+    // Validate the image URL
+    if (!imageUrl.startsWith('http') && !imageUrl.startsWith('blob:')) {
+      console.error('Invalid image URL format:', imageUrl);
+      return NextResponse.json({ error: 'Invalid image URL format' }, { status: 400 });
+    }
+
     // Perform OCR on the image
+    console.log('Calling Google Cloud Vision API...');
     const [result] = await client.textDetection(imageUrl);
+    console.log('Google Cloud Vision API response received');
+    
     const detections = result.textAnnotations || [];
+    console.log('Number of text detections:', detections.length);
 
     if (detections.length === 0) {
+      console.log('No text detected in the image');
       return NextResponse.json({ 
         error: 'No text detected in the image',
         extractedItems: []
@@ -56,10 +81,12 @@ export async function POST(request: NextRequest) {
 
     // Get the full text
     const fullText = detections[0].description || '';
-    console.log('Extracted text:', fullText);
+    console.log('Extracted text length:', fullText.length);
+    console.log('First 200 characters of extracted text:', fullText.substring(0, 200));
 
     // Parse the text to extract food items
     const extractedItems = parseReceiptText(fullText);
+    console.log('Parsed items count:', extractedItems.length);
 
     return NextResponse.json({
       success: true,
@@ -68,9 +95,15 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('OCR processing error:', error);
+    console.error('OCR processing error details:', error);
+    console.error('Error message:', error instanceof Error ? error.message : 'Unknown error');
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+    
     return NextResponse.json(
-      { error: 'Failed to process image. Please check your Google Cloud Vision setup.' },
+      { 
+        error: 'Failed to process image. Please check your Google Cloud Vision setup.',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

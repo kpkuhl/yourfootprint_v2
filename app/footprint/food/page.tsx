@@ -344,7 +344,11 @@ export default function FoodPage() {
 
   const processReceiptOCR = async (imageUrl: string) => {
     setProcessingOCR(true);
+    setError(null);
+    
     try {
+      console.log('Sending OCR request for image URL:', imageUrl);
+      
       const response = await fetch('/api/ocr', {
         method: 'POST',
         headers: {
@@ -353,18 +357,22 @@ export default function FoodPage() {
         body: JSON.stringify({ imageUrl }),
       });
 
+      console.log('OCR API response status:', response.status);
+      
       const data = await response.json();
+      console.log('OCR API response data:', data);
 
       if (data.success) {
         setExtractedItems(data.extractedItems);
         console.log('Extracted items:', data.extractedItems);
       } else {
         console.error('OCR processing failed:', data.error);
-        setError('Failed to process receipt image');
+        console.error('Error details:', data.details);
+        setError(`OCR processing failed: ${data.error}${data.details ? ` - ${data.details}` : ''}`);
       }
     } catch (error) {
       console.error('Error processing OCR:', error);
-      setError('Failed to process receipt image');
+      setError(`Failed to process receipt image: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setProcessingOCR(false);
     }
