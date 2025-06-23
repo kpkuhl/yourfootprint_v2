@@ -47,6 +47,13 @@ export default function FoodPage() {
   const [editForm, setEditForm] = useState<FoodEntry | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [processingOCR, setProcessingOCR] = useState(false);
+  const [extractedItems, setExtractedItems] = useState<Array<{
+    item: string;
+    price?: string;
+    quantity?: string;
+    category?: string;
+  }>>([]);
 
   // Fetch household ID for the user
   useEffect(() => {
@@ -335,6 +342,59 @@ export default function FoodPage() {
     }
   };
 
+  const processReceiptOCR = async (imageUrl: string) => {
+    setProcessingOCR(true);
+    try {
+      const response = await fetch('/api/ocr', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ imageUrl }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setExtractedItems(data.extractedItems);
+        console.log('Extracted items:', data.extractedItems);
+      } else {
+        console.error('OCR processing failed:', data.error);
+        setError('Failed to process receipt image');
+      }
+    } catch (error) {
+      console.error('Error processing OCR:', error);
+      setError('Failed to process receipt image');
+    } finally {
+      setProcessingOCR(false);
+    }
+  };
+
+  const addExtractedItem = (extractedItem: {
+    item: string;
+    price?: string;
+    quantity?: string;
+    category?: string;
+  }) => {
+    setFoodDetails(prev => [...prev, {
+      household_id: householdId || '',
+      date: foodEntry.date,
+      item: extractedItem.item,
+      category: extractedItem.category || null,
+      packaged: false,
+      CI_custom: null,
+      co2e_kg: 0,
+      food_entry_id: 0
+    }]);
+  };
+
+  const addAllExtractedItems = () => {
+    extractedItems.forEach(item => {
+      addExtractedItem(item);
+    });
+    setExtractedItems([]); // Clear the extracted items after adding them
+  };
+
   if (!user) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-24">
@@ -410,7 +470,71 @@ export default function FoodPage() {
                     onChange={handleFileSelect}
                     className="mt-1 block w-full"
                   />
+                  {selectedFile && (
+                    <div className="mt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          // Create a temporary URL for the selected file
+                          const tempUrl = URL.createObjectURL(selectedFile);
+                          processReceiptOCR(tempUrl);
+                        }}
+                        disabled={processingOCR}
+                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+                      >
+                        {processingOCR ? 'Processing...' : 'Process Receipt with OCR'}
+                      </button>
+                    </div>
+                  )}
                 </div>
+
+                {/* Display extracted items */}
+                {extractedItems.length > 0 && (
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-lg font-medium text-blue-900">
+                        Extracted Items ({extractedItems.length})
+                      </h3>
+                      <div className="space-x-2">
+                        <button
+                          type="button"
+                          onClick={addAllExtractedItems}
+                          className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                        >
+                          Add All
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setExtractedItems([])}
+                          className="px-3 py-1 bg-gray-600 text-white rounded-md hover:bg-gray-700 text-sm"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      {extractedItems.map((item, index) => (
+                        <div key={index} className="flex justify-between items-center p-2 bg-white rounded border">
+                          <div className="flex-1">
+                            <div className="font-medium">{item.item}</div>
+                            <div className="text-sm text-gray-600">
+                              {item.category && <span className="capitalize">{item.category}</span>}
+                              {item.price && <span className="ml-2">${item.price}</span>}
+                              {item.quantity && <span className="ml-2">Qty: {item.quantity}</span>}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => addExtractedItem(item)}
+                            className="px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
+                          >
+                            Add
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
