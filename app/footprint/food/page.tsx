@@ -65,7 +65,6 @@ export default function FoodPage() {
       }
 
       if (data) {
-        console.log('Setting household ID:', data.id); // Debug log
         setHouseholdId(data.id);
         // Update foodEntry with the household ID
         setFoodEntry(prev => ({
@@ -81,7 +80,6 @@ export default function FoodPage() {
   // Update foodEntry when householdId changes
   useEffect(() => {
     if (householdId) {
-      console.log('Updating foodEntry with household ID:', householdId); // Debug log
       setFoodEntry(prev => ({
         ...prev,
         household_id: householdId
@@ -129,16 +127,6 @@ export default function FoodPage() {
       const fileName = `${foodEntryId}-${Math.random()}.${fileExt}`;
       const filePath = `receipts/${householdId}/${fileName}`;
 
-      console.log('Uploading image to path:', filePath);
-      console.log('File details:', { name: file.name, size: file.size, type: file.type });
-
-      // First, let's check if the bucket exists
-      const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
-      console.log('Available buckets:', buckets);
-      if (bucketsError) {
-        console.error('Error listing buckets:', bucketsError);
-      }
-
       const { error: uploadError } = await supabase.storage
         .from('food')
         .upload(filePath, file);
@@ -148,24 +136,9 @@ export default function FoodPage() {
         throw uploadError;
       }
 
-      console.log('File uploaded successfully, getting public URL...');
-
       const { data: { publicUrl } } = supabase.storage
         .from('food')
         .getPublicUrl(filePath);
-
-      console.log('Generated public URL:', publicUrl);
-
-      // Test if the URL is accessible
-      try {
-        const response = await fetch(publicUrl, { method: 'HEAD' });
-        console.log('URL accessibility test:', response.status, response.statusText);
-        if (!response.ok) {
-          console.warn('URL might not be accessible:', response.status);
-        }
-      } catch (fetchError) {
-        console.warn('Could not test URL accessibility:', fetchError);
-      }
 
       return publicUrl;
     } catch (error) {
@@ -186,11 +159,6 @@ export default function FoodPage() {
     setSuccess(null);
 
     try {
-      console.log('Starting food entry submission...'); // Debug log
-      console.log('Food entry data:', foodEntry); // Debug log
-      console.log('Food details:', foodDetails); // Debug log
-      console.log('Selected file:', selectedFile); // Debug log
-
       // First, create the food entry
       const { data: entryData, error: entryError } = await supabase
         .from('food_entries')
@@ -204,16 +172,13 @@ export default function FoodPage() {
         .single();
 
       if (entryError) {
-        console.error('Error creating food entry:', entryError); // Debug log
+        console.error('Error creating food entry:', entryError);
         throw entryError;
       }
-
-      console.log('Food entry created:', entryData); // Debug log
 
       // If there's an image, upload it
       let imageUrl = null;
       if (selectedFile) {
-        console.log('Uploading image...'); // Debug log
         imageUrl = await uploadImage(selectedFile, entryData.id);
         
         // Update the entry with the image URL
@@ -223,15 +188,13 @@ export default function FoodPage() {
           .eq('id', entryData.id);
 
         if (updateError) {
-          console.error('Error updating image URL:', updateError); // Debug log
+          console.error('Error updating image URL:', updateError);
           throw updateError;
         }
       }
 
       // Add food details
       if (foodDetails.length > 0) {
-        console.log('Adding food details:', foodDetails); // Debug log
-        
         const detailsWithEntryId = foodDetails.map(detail => ({
           ...detail,
           food_entry_id: entryData.id,
@@ -239,14 +202,12 @@ export default function FoodPage() {
           date: foodEntry.date
         }));
 
-        console.log('Details with entry ID:', detailsWithEntryId); // Debug log
-
         const { error: detailsError } = await supabase
           .from('food_details')
           .insert(detailsWithEntryId);
 
         if (detailsError) {
-          console.error('Error inserting food details:', detailsError); // Debug log
+          console.error('Error inserting food details:', detailsError);
           throw detailsError;
         }
 
@@ -260,7 +221,7 @@ export default function FoodPage() {
           .eq('id', entryData.id);
 
         if (updateError) {
-          console.error('Error updating CO2e:', updateError); // Debug log
+          console.error('Error updating CO2e:', updateError);
           throw updateError;
         }
       }
@@ -296,7 +257,7 @@ export default function FoodPage() {
 
   const addFoodDetail = () => {
     if (!householdId) {
-      console.error('Cannot add food detail: household ID is missing'); // Debug log
+      console.error('Cannot add food detail: household ID is missing');
       return;
     }
     
