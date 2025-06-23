@@ -131,23 +131,36 @@ export default function FoodPage() {
   // Fetch default carbon intensity values
   useEffect(() => {
     const fetchDefaultCI = async () => {
+      console.log('=== STARTING TO FETCH CI DATA ===');
+      console.log('Querying table: CI_food_default_kg');
+      console.log('Filter: food = "default"');
+      
+      // First, let's see what's in the table without any filters
+      const { data: allData, error: allError } = await supabase
+        .from('CI_food_default_kg')
+        .select('*')
+        .limit(5);
+      
+      console.log('=== ALL DATA IN TABLE (first 5 rows) ===');
+      console.log('Error:', allError);
+      console.log('All data:', allData);
+      
+      // Now try the original query
       const { data, error } = await supabase
         .from('CI_food_default_kg')
         .select('categories, CI_kg_kg')
         .eq('food', 'default')
         .order('categories');
 
-      if (error) {
-        console.error('Error fetching default CI values:', error);
-        return;
-      }
-
       console.log('=== FETCHED CI DATA ===');
+      console.log('Error:', error);
       console.log('Raw data from database:', data);
       console.log('Number of records:', data?.length);
       if (data && data.length > 0) {
         console.log('First record:', data[0]);
         console.log('All categories:', data.map(ci => `"${ci.categories}"`));
+      } else {
+        console.log('No data returned from query');
       }
       setDefaultCIValues(data || []);
     };
