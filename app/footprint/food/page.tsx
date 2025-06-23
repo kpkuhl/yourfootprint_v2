@@ -142,6 +142,7 @@ export default function FoodPage() {
         return;
       }
 
+      console.log('Fetched default CI values:', data);
       setDefaultCIValues(data || []);
     };
 
@@ -162,6 +163,10 @@ export default function FoodPage() {
 
     // Find the default CI for the category
     const defaultCI = defaultCIValues.find(ci => ci.categories === category);
+    console.log('Looking for category:', category);
+    console.log('Available categories:', defaultCIValues.map(ci => ci.categories));
+    console.log('Found default CI:', defaultCI);
+    
     return defaultCI ? defaultCI.CI_kg_kg : 2.0; // Fallback to moderate default
   };
 
@@ -734,19 +739,15 @@ export default function FoodPage() {
                   <label htmlFor="type" className="block text-sm font-medium text-gray-700">
                     Type
                   </label>
-                  <select
+                  <input
+                    type="text"
                     id="type"
                     name="type"
                     value={foodEntry.type}
                     onChange={handleChange}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                    required
-                  >
-                    <option value="">Select a type</option>
-                    <option value="grocery">Grocery Shopping</option>
-                    <option value="restaurant">Restaurant</option>
-                    <option value="takeout">Takeout</option>
-                  </select>
+                    placeholder="e.g., Grocery shopping, Restaurant meal"
+                  />
                 </div>
 
                 <div>
@@ -1147,6 +1148,20 @@ export default function FoodPage() {
                     <p className="text-sm text-blue-600 mt-1">
                       Combined carbon footprint of all {foodDetails.length} food item{foodDetails.length !== 1 ? 's' : ''}
                     </p>
+                  </div>
+                )}
+
+                {/* Debug section to show available categories */}
+                {defaultCIValues.length > 0 && (
+                  <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                    <h3 className="text-sm font-semibold text-yellow-800 mb-2">Debug: Available Categories from Database</h3>
+                    <div className="text-xs text-yellow-700">
+                      {defaultCIValues.map((ci, index) => (
+                        <div key={index}>
+                          "{ci.categories}": {ci.CI_kg_kg} kg CO2e/kg
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 
