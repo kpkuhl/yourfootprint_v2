@@ -482,13 +482,25 @@ export default function FoodPage() {
       co2e_kg: 0,
       food_entry_id: 0
     }]);
+    
+    // Remove the item from extracted items after adding it
+    setExtractedItems(prev => prev.filter(item => item !== extractedItem));
   };
 
   const addAllExtractedItems = () => {
-    extractedItems.forEach(item => {
-      addExtractedItem(item);
-    });
-    setExtractedItems([]); // Clear the extracted items after adding them
+    const itemsToAdd = extractedItems.map(extractedItem => ({
+      household_id: householdId || '',
+      date: foodEntry.date,
+      item: extractedItem.item,
+      category: extractedItem.category || null,
+      packaged: false,
+      CI_custom: null,
+      co2e_kg: 0,
+      food_entry_id: 0
+    }));
+    
+    setFoodDetails(prev => [...prev, ...itemsToAdd]);
+    setExtractedItems([]); // Clear all extracted items
   };
 
   if (!user) {
@@ -606,24 +618,75 @@ export default function FoodPage() {
                         </button>
                       </div>
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       {extractedItems.map((item, index) => (
-                        <div key={index} className="flex justify-between items-center p-2 bg-white rounded border">
-                          <div className="flex-1">
-                            <div className="font-medium">{item.item}</div>
-                            <div className="text-sm text-gray-600">
-                              {item.category && <span className="capitalize">{item.category}</span>}
-                              {item.price && <span className="ml-2">${item.price}</span>}
-                              {item.quantity && <span className="ml-2">Qty: {item.quantity}</span>}
+                        <div key={index} className="bg-white rounded border p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex-1">
+                              <div className="font-medium text-gray-900">{item.item}</div>
+                              {item.price && (
+                                <div className="text-sm text-gray-600">Price: {item.price}</div>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => addExtractedItem(item)}
+                              className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm ml-2"
+                            >
+                              Add
+                            </button>
+                          </div>
+                          
+                          {/* Quantity and Category Selection */}
+                          <div className="grid grid-cols-2 gap-3 mt-2">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">
+                                Quantity
+                              </label>
+                              <input
+                                type="number"
+                                min="0.1"
+                                step="0.1"
+                                value={item.quantity || ''}
+                                onChange={(e) => {
+                                  const newItems = [...extractedItems];
+                                  newItems[index] = {
+                                    ...newItems[index],
+                                    quantity: e.target.value
+                                  };
+                                  setExtractedItems(newItems);
+                                }}
+                                placeholder="1.0"
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                              />
+                            </div>
+                            
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">
+                                Category
+                              </label>
+                              <select
+                                value={item.category || ''}
+                                onChange={(e) => {
+                                  const newItems = [...extractedItems];
+                                  newItems[index] = {
+                                    ...newItems[index],
+                                    category: e.target.value
+                                  };
+                                  setExtractedItems(newItems);
+                                }}
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                              >
+                                <option value="">Select category</option>
+                                <option value="meat">Meat</option>
+                                <option value="dairy">Dairy</option>
+                                <option value="produce">Produce</option>
+                                <option value="grains">Grains</option>
+                                <option value="processed">Processed Food</option>
+                                <option value="other">Other</option>
+                              </select>
                             </div>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => addExtractedItem(item)}
-                            className="px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
-                          >
-                            Add
-                          </button>
                         </div>
                       ))}
                     </div>
