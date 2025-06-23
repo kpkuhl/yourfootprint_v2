@@ -243,12 +243,16 @@ function parseReceiptText(text: string): Array<{
     // Extract price - prioritize prices at the end of the line
     let price: string | undefined;
     
+    console.log(`Looking for prices in line: "${trimmedLine}"`);
+    
     // First, try to find price at the end of the line (most common in receipts)
     const endPriceMatch = trimmedLine.match(/(\$?\d+\.\d{2})\s*$/);
     if (endPriceMatch) {
       price = endPriceMatch[1];
       console.log(`Found end price: "${price}" in line: "${trimmedLine}"`);
     } else {
+      console.log(`No end price found, checking for separated prices...`);
+      
       // Look for prices that are clearly separated from item names
       // This pattern looks for prices that come after some text and are separated by spaces
       const separatedPriceMatch = trimmedLine.match(/([A-Za-z\s]+)\s+(\$?\d+\.\d{2})/);
@@ -256,14 +260,20 @@ function parseReceiptText(text: string): Array<{
         price = separatedPriceMatch[2];
         console.log(`Found separated price: "${price}" in line: "${trimmedLine}"`);
       } else {
+        console.log(`No separated price found, checking for any price patterns...`);
+        
         // More flexible approach: find any price pattern in the line
         // but prioritize prices that appear after some text
         const allPriceMatches = trimmedLine.match(/(\$?\d+\.\d{2})/g);
+        console.log(`All price matches found:`, allPriceMatches);
+        
         if (allPriceMatches && allPriceMatches.length > 0) {
           // If there are multiple prices, take the last one (most likely to be the actual price)
           price = allPriceMatches[allPriceMatches.length - 1];
           console.log(`Found price from multiple matches: "${price}" in line: "${trimmedLine}"`);
         } else {
+          console.log(`No price patterns found in line: "${trimmedLine}"`);
+          
           // Fall back to finding any price in the line, but be more careful
           // Look for prices that are at least 3 characters from the start (to avoid item codes)
           const priceMatch = trimmedLine.match(/(\$?\d+\.\d{2})/);
@@ -273,7 +283,11 @@ function parseReceiptText(text: string): Array<{
             if (priceIndex > 3) {
               price = priceMatch[0];
               console.log(`Found price with fallback: "${price}" in line: "${trimmedLine}"`);
+            } else {
+              console.log(`Price found but too close to start (likely item code): "${priceMatch[0]}"`);
             }
+          } else {
+            console.log(`No price match found at all in line: "${trimmedLine}"`);
           }
         }
       }
