@@ -683,12 +683,16 @@ export default function FoodPage() {
                                 className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                               >
                                 <option value="">Select category</option>
-                                <option value="meat">Meat</option>
-                                <option value="dairy">Dairy</option>
-                                <option value="produce">Produce</option>
-                                <option value="grains">Grains</option>
-                                <option value="processed">Processed Food</option>
-                                <option value="other">Other</option>
+                                <option value="Beef">Beef</option>
+                                <option value="Meat (not beef)">Meat (not beef)</option>
+                                <option value="Milk, Eggs, Butter, Oil">Milk, Eggs, Butter, Oil</option>
+                                <option value="Grain, Nuts, Beans">Grain, Nuts, Beans</option>
+                                <option value="Produce">Produce</option>
+                                <option value="Processed Food (w/ meat or cheese)">Processed Food (w/ meat or cheese)</option>
+                                <option value="Processed Food (no meat or cheese)">Processed Food (no meat or cheese)</option>
+                                <option value="Cheese">Cheese</option>
+                                <option value="Coffee, Tea">Coffee, Tea</option>
+                                <option value="Chocolate">Chocolate</option>
                               </select>
                             </div>
 
@@ -768,7 +772,7 @@ export default function FoodPage() {
                               Override default category values if you have more accurate data
                             </p>
                             <p className="text-xs text-gray-400 mt-1">
-                              Typical ranges: Meat (10-50), Dairy (1-5), Produce (0.1-2), Grains (0.5-3), Processed (1-8)
+                              Typical ranges: Beef (20-60), Meat (10-30), Dairy (1-5), Produce (0.1-2), Grains (0.5-3), Processed (1-8)
                             </p>
                           </div>
                         </div>
@@ -814,11 +818,16 @@ export default function FoodPage() {
                           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                         >
                           <option value="">Select a category</option>
-                          <option value="meat">Meat</option>
-                          <option value="dairy">Dairy</option>
-                          <option value="produce">Produce</option>
-                          <option value="grains">Grains</option>
-                          <option value="processed">Processed Food</option>
+                          <option value="Beef">Beef</option>
+                          <option value="Meat (not beef)">Meat (not beef)</option>
+                          <option value="Milk, Eggs, Butter, Oil">Milk, Eggs, Butter, Oil</option>
+                          <option value="Grain, Nuts, Beans">Grain, Nuts, Beans</option>
+                          <option value="Produce">Produce</option>
+                          <option value="Processed Food (w/ meat or cheese)">Processed Food (w/ meat or cheese)</option>
+                          <option value="Processed Food (no meat or cheese)">Processed Food (no meat or cheese)</option>
+                          <option value="Cheese">Cheese</option>
+                          <option value="Coffee, Tea">Coffee, Tea</option>
+                          <option value="Chocolate">Chocolate</option>
                         </select>
                       </div>
 
@@ -885,7 +894,7 @@ export default function FoodPage() {
                           Override default category values if you have more accurate data
                         </p>
                         <p className="mt-1 text-sm text-gray-400">
-                          Typical ranges: Meat (10-50), Dairy (1-5), Produce (0.1-2), Grains (0.5-3), Processed (1-8)
+                          Typical ranges: Beef (20-60), Meat (10-30), Dairy (1-5), Produce (0.1-2), Grains (0.5-3), Processed (1-8)
                         </p>
                       </div>
                     </div>
