@@ -788,7 +788,7 @@ export default function FoodPage() {
                               </label>
                               <input
                                 type="number"
-                                min="0.1"
+                                min="0.001"
                                 step="0.001"
                                 value={item.quantity || ''}
                                 onChange={(e) => {
@@ -975,8 +975,8 @@ export default function FoodPage() {
                         </label>
                         <input
                           type="number"
+                          min="0.001"
                           step="0.001"
-                          min="0.01"
                           value={detail.kg_food || ''}
                           onChange={(e) => updateFoodDetail(index, 'kg_food', e.target.value ? parseFloat(e.target.value) : null)}
                           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
