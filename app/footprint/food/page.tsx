@@ -130,6 +130,14 @@ export default function FoodPage() {
       const filePath = `receipts/${householdId}/${fileName}`;
 
       console.log('Uploading image to path:', filePath);
+      console.log('File details:', { name: file.name, size: file.size, type: file.type });
+
+      // First, let's check if the bucket exists
+      const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
+      console.log('Available buckets:', buckets);
+      if (bucketsError) {
+        console.error('Error listing buckets:', bucketsError);
+      }
 
       const { error: uploadError } = await supabase.storage
         .from('food')
@@ -140,11 +148,25 @@ export default function FoodPage() {
         throw uploadError;
       }
 
+      console.log('File uploaded successfully, getting public URL...');
+
       const { data: { publicUrl } } = supabase.storage
         .from('food')
         .getPublicUrl(filePath);
 
-      console.log('Image uploaded successfully, URL:', publicUrl);
+      console.log('Generated public URL:', publicUrl);
+
+      // Test if the URL is accessible
+      try {
+        const response = await fetch(publicUrl, { method: 'HEAD' });
+        console.log('URL accessibility test:', response.status, response.statusText);
+        if (!response.ok) {
+          console.warn('URL might not be accessible:', response.status);
+        }
+      } catch (fetchError) {
+        console.warn('Could not test URL accessibility:', fetchError);
+      }
+
       return publicUrl;
     } catch (error) {
       console.error('Error uploading image:', error);
