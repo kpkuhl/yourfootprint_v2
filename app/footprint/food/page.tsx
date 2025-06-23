@@ -203,6 +203,12 @@ export default function FoodPage() {
       return;
     }
 
+    // If we're editing an existing entry, use the edit submit function
+    if (editingId) {
+      await handleEditSubmit(e);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setSuccess(null);
@@ -290,6 +296,101 @@ export default function FoodPage() {
 
     } catch (error) {
       console.error('Error saving food entry:', error);
+      setError('Failed to save food entry. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !householdId || !editingId) {
+      setError('Please sign in to save data');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      // Update the food entry
+      const { error: entryError } = await supabase
+        .from('food_entries')
+        .update({
+          date: foodEntry.date,
+          type: foodEntry.type
+        })
+        .eq('id', editingId)
+        .eq('household_id', householdId);
+
+      if (entryError) {
+        console.error('Error updating food entry:', entryError);
+        throw entryError;
+      }
+
+      // Delete existing food details
+      const { error: deleteError } = await supabase
+        .from('food_details')
+        .delete()
+        .eq('food_entry_id', editingId)
+        .eq('household_id', householdId);
+
+      if (deleteError) {
+        console.error('Error deleting existing food details:', deleteError);
+        throw deleteError;
+      }
+
+      // Add updated food details
+      if (foodDetails.length > 0) {
+        const detailsWithEntryId = foodDetails.map(detail => ({
+          ...detail,
+          food_entry_id: editingId,
+          household_id: householdId,
+          date: foodEntry.date
+        }));
+
+        const { error: detailsError } = await supabase
+          .from('food_details')
+          .insert(detailsWithEntryId);
+
+        if (detailsError) {
+          console.error('Error inserting updated food details:', detailsError);
+          throw detailsError;
+        }
+
+        // Calculate total CO2e
+        const totalCO2e = foodDetails.reduce((sum, detail) => sum + detail.co2e_kg, 0);
+
+        // Update the entry with the total CO2e
+        const { error: updateError } = await supabase
+          .from('food_entries')
+          .update({ co2e: totalCO2e })
+          .eq('id', editingId);
+
+        if (updateError) {
+          console.error('Error updating CO2e:', updateError);
+          throw updateError;
+        }
+      }
+
+      setSuccess('Food entry updated successfully!');
+      setEditingId(null);
+      setEditForm(null);
+      setIsNewEntry(true);
+      setFoodEntry({
+        household_id: householdId,
+        date: new Date().toISOString().split('T')[0],
+        type: '',
+        image_url: null,
+        co2e: null
+      });
+      setFoodDetails([]);
+      setSelectedFile(null);
+      setUploadProgress(0);
+
+    } catch (error) {
+      console.error('Error updating food entry:', error);
       setError('Failed to save food entry. Please try again.');
     } finally {
       setLoading(false);
