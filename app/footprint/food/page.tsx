@@ -28,7 +28,7 @@ type FoodDetail = {
 };
 
 type DefaultCI = {
-  category: string;
+  categories: string;
   CI_kg_kg: number;
 };
 
@@ -133,8 +133,9 @@ export default function FoodPage() {
     const fetchDefaultCI = async () => {
       const { data, error } = await supabase
         .from('CI_food_default_kg')
-        .select('category, CI_kg_kg')
-        .order('category');
+        .select('categories, CI_kg_kg')
+        .eq('food', 'default')
+        .order('categories');
 
       if (error) {
         console.error('Error fetching default CI values:', error);
@@ -160,7 +161,7 @@ export default function FoodPage() {
     }
 
     // Find the default CI for the category
-    const defaultCI = defaultCIValues.find(ci => ci.category === category);
+    const defaultCI = defaultCIValues.find(ci => ci.categories === category);
     return defaultCI ? defaultCI.CI_kg_kg : 2.0; // Fallback to moderate default
   };
 
