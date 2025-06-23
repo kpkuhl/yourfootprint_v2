@@ -154,6 +154,44 @@ export default function FoodPage() {
     }
   };
 
+  const compressImage = (file: File, maxWidth: number = 1024): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      
+      img.onload = () => {
+        // Calculate new dimensions
+        const ratio = Math.min(maxWidth / img.width, maxWidth / img.height);
+        const newWidth = img.width * ratio;
+        const newHeight = img.height * ratio;
+        
+        // Set canvas size
+        canvas.width = newWidth;
+        canvas.height = newHeight;
+        
+        // Draw and compress
+        ctx?.drawImage(img, 0, 0, newWidth, newHeight);
+        
+        // Convert to blob with compression
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const compressedFile = new File([blob], file.name, {
+              type: 'image/jpeg',
+              lastModified: Date.now(),
+            });
+            resolve(compressedFile);
+          } else {
+            reject(new Error('Failed to compress image'));
+          }
+        }, 'image/jpeg', 0.7); // 70% quality
+      };
+      
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !householdId) {
@@ -358,6 +396,14 @@ export default function FoodPage() {
         return;
       }
       
+      // Compress image if it's larger than 1MB
+      let processedFile = file;
+      if (file.size > 1024 * 1024) { // 1MB
+        console.log('Compressing image to reduce size...');
+        processedFile = await compressImage(file);
+        console.log('Compressed file size:', processedFile.size, 'bytes');
+      }
+      
       // Convert file to base64
       const base64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
@@ -366,15 +412,15 @@ export default function FoodPage() {
           // Remove the data:image/...;base64, prefix
           const base64Data = result.split(',')[1];
           console.log('File converted to base64, length:', base64Data.length);
-          console.log('File type:', file.type);
-          console.log('File size:', file.size);
+          console.log('File type:', processedFile.type);
+          console.log('File size:', processedFile.size);
           resolve(base64Data);
         };
         reader.onerror = (error) => {
           console.error('Error reading file:', error);
           reject(error);
         };
-        reader.readAsDataURL(file);
+        reader.readAsDataURL(processedFile);
       });
 
       console.log('Sending OCR request with base64 image data...');
@@ -392,7 +438,7 @@ export default function FoodPage() {
         },
         body: JSON.stringify({ 
           imageData: base64,
-          imageType: file.type 
+          imageType: processedFile.type 
         }),
       });
 
