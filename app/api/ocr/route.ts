@@ -89,10 +89,19 @@ export async function POST(request: NextRequest) {
     const fullText = detections[0].description || '';
     console.log('Extracted text length:', fullText.length);
     console.log('First 200 characters of extracted text:', fullText.substring(0, 200));
+    console.log('Full extracted text:', fullText);
 
     // Parse the text to extract food items
     const extractedItems = parseReceiptText(fullText);
     console.log('Parsed items count:', extractedItems.length);
+    console.log('Parsed items:', extractedItems);
+
+    if (extractedItems.length === 0 && fullText.length > 0) {
+      console.log('Text was extracted but no items were parsed. This might indicate:');
+      console.log('1. The parsing logic is too strict');
+      console.log('2. The receipt format is different than expected');
+      console.log('3. The text needs preprocessing');
+    }
 
     return NextResponse.json({
       success: true,
@@ -129,6 +138,9 @@ function parseReceiptText(text: string): Array<{
     category?: string;
   }> = [];
 
+  console.log('Processing lines:', lines.length);
+  console.log('Sample lines:', lines.slice(0, 5));
+
   // Common food keywords to identify items
   const foodKeywords = [
     'milk', 'bread', 'eggs', 'cheese', 'yogurt', 'butter', 'cream',
@@ -136,13 +148,22 @@ function parseReceiptText(text: string): Array<{
     'apple', 'banana', 'orange', 'tomato', 'lettuce', 'carrot', 'onion',
     'rice', 'pasta', 'flour', 'sugar', 'salt', 'pepper', 'oil',
     'cereal', 'oatmeal', 'granola', 'nuts', 'chips', 'cookies',
-    'soda', 'juice', 'water', 'coffee', 'tea', 'beer', 'wine'
+    'soda', 'juice', 'water', 'coffee', 'tea', 'beer', 'wine',
+    'organic', 'fresh', 'frozen', 'canned', 'bottle', 'pack', 'bag'
   ];
 
-  // Price regex pattern
-  const pricePattern = /\$?\d+\.\d{2}/;
-  // Quantity regex pattern
-  const quantityPattern = /(\d+(?:\.\d+)?)\s*(?:x|@|ea|each|lb|oz|kg|g)/i;
+  // More flexible price regex patterns
+  const pricePatterns = [
+    /\$?\d+\.\d{2}/,           // $12.34 or 12.34
+    /\$?\d+\.\d{1}/,           // $12.3 or 12.3
+    /\$?\d+/,                  // $12 or 12
+  ];
+  
+  // More flexible quantity regex patterns
+  const quantityPatterns = [
+    /(\d+(?:\.\d+)?)\s*(?:x|@|ea|each|lb|oz|kg|g|pack|pkg)/i,
+    /(\d+(?:\.\d+)?)\s*$/i,    // Number at end of line
+  ];
 
   for (const line of lines) {
     const trimmedLine = line.trim();
@@ -152,35 +173,62 @@ function parseReceiptText(text: string): Array<{
         trimmedLine.toLowerCase().includes('subtotal') ||
         trimmedLine.toLowerCase().includes('tax') ||
         trimmedLine.toLowerCase().includes('change') ||
-        trimmedLine.toLowerCase().includes('thank')) {
+        trimmedLine.toLowerCase().includes('thank') ||
+        trimmedLine.toLowerCase().includes('receipt') ||
+        trimmedLine.toLowerCase().includes('store') ||
+        trimmedLine.toLowerCase().includes('date') ||
+        trimmedLine.toLowerCase().includes('time')) {
       continue;
     }
 
-    // Extract price
-    const priceMatch = trimmedLine.match(pricePattern);
-    const price = priceMatch ? priceMatch[0] : undefined;
+    // Skip very short lines
+    if (trimmedLine.length < 3) {
+      continue;
+    }
 
-    // Extract quantity
-    const quantityMatch = trimmedLine.match(quantityPattern);
-    const quantity = quantityMatch ? quantityMatch[1] : undefined;
+    // Extract price using multiple patterns
+    let price: string | undefined;
+    for (const pattern of pricePatterns) {
+      const priceMatch = trimmedLine.match(pattern);
+      if (priceMatch) {
+        price = priceMatch[0];
+        break;
+      }
+    }
+
+    // Extract quantity using multiple patterns
+    let quantity: string | undefined;
+    for (const pattern of quantityPatterns) {
+      const quantityMatch = trimmedLine.match(pattern);
+      if (quantityMatch) {
+        quantity = quantityMatch[1];
+        break;
+      }
+    }
 
     // Extract item name (remove price and quantity from line)
     let itemName = trimmedLine;
     if (price) {
       itemName = itemName.replace(price, '').trim();
     }
-    if (quantityMatch) {
-      itemName = itemName.replace(quantityMatch[0], '').trim();
+    if (quantity) {
+      // Remove the full quantity match
+      const quantityMatch = trimmedLine.match(quantityPatterns.find(p => p.test(trimmedLine)) || /()/);
+      if (quantityMatch) {
+        itemName = itemName.replace(quantityMatch[0], '').trim();
+      }
     }
 
     // Clean up item name
     itemName = itemName.replace(/^\d+\s*/, '').trim(); // Remove leading numbers
     itemName = itemName.replace(/\s+/g, ' ').trim(); // Normalize whitespace
 
-    // Only add if we have a meaningful item name
-    if (itemName.length > 2 && itemName.length < 50) {
+    // More flexible item name validation
+    if (itemName.length > 2 && itemName.length < 100) {
       // Try to categorize the item
       const category = categorizeFoodItem(itemName);
+      
+      console.log(`Parsed line: "${trimmedLine}" -> item: "${itemName}", price: "${price}", quantity: "${quantity}", category: "${category}"`);
       
       items.push({
         item: itemName,
