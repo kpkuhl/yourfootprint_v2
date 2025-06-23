@@ -628,7 +628,25 @@ export default function FoodPage() {
                         <div key={index} className="bg-white rounded border p-3">
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex-1">
-                              <div className="font-medium text-gray-900">{item.item}</div>
+                              <div className="mb-2">
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Item Name
+                                </label>
+                                <input
+                                  type="text"
+                                  value={item.item}
+                                  onChange={(e) => {
+                                    const newItems = [...extractedItems];
+                                    newItems[index] = {
+                                      ...newItems[index],
+                                      item: e.target.value
+                                    };
+                                    setExtractedItems(newItems);
+                                  }}
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                  placeholder="Enter item name"
+                                />
+                              </div>
                               {item.price && (
                                 <div className="text-sm text-gray-600">Price: {item.price}</div>
                               )}
