@@ -28,7 +28,7 @@ type FoodDetail = {
 };
 
 type DefaultCI = {
-  categories: string;
+  category: string;
   CI_kg_kg: number;
 };
 
@@ -145,12 +145,12 @@ export default function FoodPage() {
       console.log('Error:', allError);
       console.log('All data:', allData);
       
-      // Now try the original query
+      // Now try the original query with correct field name
       const { data, error } = await supabase
         .from('CI_food_default_kg')
-        .select('categories, CI_kg_kg')
+        .select('category, CI_kg_kg')
         .eq('food', 'default')
-        .order('categories');
+        .order('category');
 
       console.log('=== FETCHED CI DATA ===');
       console.log('Error:', error);
@@ -158,7 +158,7 @@ export default function FoodPage() {
       console.log('Number of records:', data?.length);
       if (data && data.length > 0) {
         console.log('First record:', data[0]);
-        console.log('All categories:', data.map(ci => `"${ci.categories}"`));
+        console.log('All categories:', data.map(ci => `"${ci.category}"`));
       } else {
         console.log('No data returned from query');
       }
@@ -173,7 +173,7 @@ export default function FoodPage() {
     console.log('=== GETTING CARBON INTENSITY ===');
     console.log('Input category:', `"${category}"`);
     console.log('Custom CI:', customCI);
-    console.log('Available categories in state:', defaultCIValues.map(ci => `"${ci.categories}"`));
+    console.log('Available categories in state:', defaultCIValues.map(ci => `"${ci.category}"`));
     
     // If custom CI is provided, use it
     if (customCI !== null) {
@@ -189,10 +189,10 @@ export default function FoodPage() {
 
     // Find the default CI for the category with more robust matching
     const defaultCI = defaultCIValues.find(ci => {
-      const dbCategory = ci.categories.trim().toLowerCase();
+      const dbCategory = ci.category.trim().toLowerCase();
       const inputCategory = category.trim().toLowerCase();
       const matches = dbCategory === inputCategory;
-      console.log(`Comparing: "${ci.categories}" (${dbCategory}) vs "${category}" (${inputCategory}) = ${matches}`);
+      console.log(`Comparing: "${ci.category}" (${dbCategory}) vs "${category}" (${inputCategory}) = ${matches}`);
       return matches;
     });
     
@@ -1190,7 +1190,7 @@ export default function FoodPage() {
                     <div className="text-xs text-yellow-700">
                       {defaultCIValues.map((ci, index) => (
                         <div key={index}>
-                          "{ci.categories}": {ci.CI_kg_kg} kg CO2e/kg
+                          "{ci.category}": {ci.CI_kg_kg} kg CO2e/kg
                         </div>
                       ))}
                     </div>
