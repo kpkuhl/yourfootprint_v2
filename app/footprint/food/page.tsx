@@ -29,7 +29,7 @@ type FoodDetail = {
 
 type DefaultCI = {
   category: string;
-  CI_kg_kg: number;
+  CI_kg: number;
 };
 
 const STORAGE_KEY = 'foodFormData';
@@ -148,7 +148,7 @@ export default function FoodPage() {
       // Now try the original query with correct field name
       const { data, error } = await supabase
         .from('CI_food_default_kg')
-        .select('category, CI_kg_kg')
+        .select('category, CI_kg')
         .eq('food', 'default')
         .order('category');
 
@@ -197,7 +197,7 @@ export default function FoodPage() {
     });
     
     console.log('Found default CI:', defaultCI);
-    const result = defaultCI ? defaultCI.CI_kg_kg : 2.0;
+    const result = defaultCI ? defaultCI.CI_kg : 2.0;
     console.log('Final result:', result);
     return result;
   };
@@ -1190,7 +1190,7 @@ export default function FoodPage() {
                     <div className="text-xs text-yellow-700">
                       {defaultCIValues.map((ci, index) => (
                         <div key={index}>
-                          "{ci.category}": {ci.CI_kg_kg} kg CO2e/kg
+                          "{ci.category}": {ci.CI_kg} kg CO2e/kg
                         </div>
                       ))}
                     </div>
