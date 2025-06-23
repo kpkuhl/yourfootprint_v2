@@ -131,37 +131,17 @@ export default function FoodPage() {
   // Fetch default carbon intensity values
   useEffect(() => {
     const fetchDefaultCI = async () => {
-      console.log('=== STARTING TO FETCH CI DATA ===');
-      console.log('Querying table: CI_food_default_kg');
-      console.log('Filter: food = "default"');
-      
-      // First, let's see what's in the table without any filters
-      const { data: allData, error: allError } = await supabase
-        .from('CI_food_default_kg')
-        .select('*')
-        .limit(5);
-      
-      console.log('=== ALL DATA IN TABLE (first 5 rows) ===');
-      console.log('Error:', allError);
-      console.log('All data:', allData);
-      
-      // Now try the original query with correct field name
       const { data, error } = await supabase
         .from('CI_food_default_kg')
         .select('category, CI_kg')
         .eq('food', 'default')
         .order('category');
 
-      console.log('=== FETCHED CI DATA ===');
-      console.log('Error:', error);
-      console.log('Raw data from database:', data);
-      console.log('Number of records:', data?.length);
-      if (data && data.length > 0) {
-        console.log('First record:', data[0]);
-        console.log('All categories:', data.map(ci => `"${ci.category}"`));
-      } else {
-        console.log('No data returned from query');
+      if (error) {
+        console.error('Error fetching default CI values:', error);
+        return;
       }
+
       setDefaultCIValues(data || []);
     };
 
@@ -170,36 +150,22 @@ export default function FoodPage() {
 
   // Function to get carbon intensity for a food item
   const getCarbonIntensity = (category: string | null, customCI: number | null): number => {
-    console.log('=== GETTING CARBON INTENSITY ===');
-    console.log('Input category:', `"${category}"`);
-    console.log('Custom CI:', customCI);
-    console.log('Available categories in state:', defaultCIValues.map(ci => `"${ci.category}"`));
-    
     // If custom CI is provided, use it
     if (customCI !== null) {
-      console.log('Using custom CI:', customCI);
       return customCI;
     }
 
     // If no category, use a default value
     if (!category) {
-      console.log('No category provided, using default 2.0');
       return 2.0; // Default moderate carbon intensity
     }
 
     // Find the default CI for the category with more robust matching
-    const defaultCI = defaultCIValues.find(ci => {
-      const dbCategory = ci.category.trim().toLowerCase();
-      const inputCategory = category.trim().toLowerCase();
-      const matches = dbCategory === inputCategory;
-      console.log(`Comparing: "${ci.category}" (${dbCategory}) vs "${category}" (${inputCategory}) = ${matches}`);
-      return matches;
-    });
+    const defaultCI = defaultCIValues.find(ci => 
+      ci.category.trim().toLowerCase() === category.trim().toLowerCase()
+    );
     
-    console.log('Found default CI:', defaultCI);
-    const result = defaultCI ? defaultCI.CI_kg : 2.0;
-    console.log('Final result:', result);
-    return result;
+    return defaultCI ? defaultCI.CI_kg : 2.0; // Fallback to moderate default
   };
 
   // Function to calculate CO2e for a food item
@@ -1180,34 +1146,6 @@ export default function FoodPage() {
                     <p className="text-sm text-blue-600 mt-1">
                       Combined carbon footprint of all {foodDetails.length} food item{foodDetails.length !== 1 ? 's' : ''}
                     </p>
-                  </div>
-                )}
-
-                {/* Debug section to show available categories */}
-                {defaultCIValues.length > 0 && (
-                  <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                    <h3 className="text-sm font-semibold text-yellow-800 mb-2">Debug: Available Categories from Database</h3>
-                    <div className="text-xs text-yellow-700">
-                      {defaultCIValues.map((ci, index) => (
-                        <div key={index}>
-                          "{ci.category}": {ci.CI_kg} kg CO2e/kg
-                        </div>
-                      ))}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        console.log('=== TESTING CARBON INTENSITY ===');
-                        const testCategories = ['Beef', 'Produce', 'Cheese'];
-                        testCategories.forEach(cat => {
-                          const ci = getCarbonIntensity(cat, null);
-                          console.log(`Test ${cat}: ${ci} kg CO2e/kg`);
-                        });
-                      }}
-                      className="mt-2 px-3 py-1 bg-yellow-600 text-white text-xs rounded hover:bg-yellow-700"
-                    >
-                      Test Carbon Intensity
-                    </button>
                   </div>
                 )}
 
