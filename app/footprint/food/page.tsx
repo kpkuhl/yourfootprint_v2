@@ -646,7 +646,7 @@ export default function FoodPage() {
                           <div className="grid grid-cols-3 gap-3 mt-2">
                             <div>
                               <label className="block text-xs font-medium text-gray-700 mb-1">
-                                Quantity
+                                Quantity (kg)
                               </label>
                               <input
                                 type="number"
