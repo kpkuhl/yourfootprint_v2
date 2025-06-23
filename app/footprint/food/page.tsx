@@ -20,10 +20,11 @@ type FoodDetail = {
   item: string;
   category: string | null;
   packaged: boolean;
-  packaging?: string | string[] | null;
+  packaging_type?: string[] | null;
   CI_custom: number | null;
   co2e_kg: number;
   food_entry_id: number;
+  kg_food: number | null;
 };
 
 const STORAGE_KEY = 'foodFormData';
@@ -310,10 +311,11 @@ export default function FoodPage() {
       item: '',
       category: null,
       packaged: false,
-      packaging: null,
+      packaging_type: null,
       CI_custom: null,
       co2e_kg: 0,
-      food_entry_id: 0
+      food_entry_id: 0,
+      kg_food: null
     }]);
   };
 
@@ -481,9 +483,11 @@ export default function FoodPage() {
       packaged: Array.isArray(extractedItem.packaging) 
         ? extractedItem.packaging.some(p => p !== 'none')
         : (extractedItem.packaging && extractedItem.packaging !== 'none'),
+      packaging_type: Array.isArray(extractedItem.packaging) ? extractedItem.packaging : null,
       CI_custom: extractedItem.CI_custom || null,
       co2e_kg: 0,
-      food_entry_id: 0
+      food_entry_id: 0,
+      kg_food: extractedItem.quantity ? parseFloat(extractedItem.quantity) : null
     }]);
     
     // Remove the item from extracted items after adding it
@@ -499,9 +503,11 @@ export default function FoodPage() {
       packaged: Array.isArray(item.packaging) 
         ? item.packaging.some(p => p !== 'none')
         : (item.packaging && item.packaging !== 'none'),
+      packaging_type: Array.isArray(item.packaging) ? item.packaging : null,
       CI_custom: item.CI_custom || null,
       co2e_kg: 0,
-      food_entry_id: 0
+      food_entry_id: 0,
+      kg_food: item.quantity ? parseFloat(item.quantity) : null
     }));
     
     setFoodDetails(prev => [...prev, ...newFoodDetails]);
@@ -864,6 +870,21 @@ export default function FoodPage() {
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700">
+                          Quantity (kg)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0.01"
+                          value={detail.kg_food || ''}
+                          onChange={(e) => updateFoodDetail(index, 'kg_food', e.target.value ? parseFloat(e.target.value) : null)}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                          placeholder="1.0"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
                           Packaging
                         </label>
                         <div className="space-y-2 mt-2">
@@ -874,17 +895,17 @@ export default function FoodPage() {
                                 checked={
                                   packagingType === 'none' 
                                     ? !detail.packaged 
-                                    : (Array.isArray(detail.packaging) 
-                                        ? detail.packaging.includes(packagingType)
-                                        : detail.packaging === packagingType)
+                                    : (Array.isArray(detail.packaging_type) 
+                                        ? detail.packaging_type.includes(packagingType)
+                                        : detail.packaging_type === packagingType)
                                 }
                                 onChange={(e) => {
-                                  const currentPackaging = detail.packaging || [];
+                                  const currentPackaging = detail.packaging_type || [];
                                   const packagingArray = Array.isArray(currentPackaging) ? currentPackaging : [];
                                   
                                   if (packagingType === 'none') {
                                     updateFoodDetail(index, 'packaged', !e.target.checked);
-                                    updateFoodDetail(index, 'packaging', null);
+                                    updateFoodDetail(index, 'packaging_type', null);
                                   } else {
                                     if (e.target.checked) {
                                       // Add packaging type
@@ -893,12 +914,12 @@ export default function FoodPage() {
                                         updatedPackaging.push(packagingType);
                                       }
                                       updateFoodDetail(index, 'packaged', true);
-                                      updateFoodDetail(index, 'packaging', updatedPackaging);
+                                      updateFoodDetail(index, 'packaging_type', updatedPackaging);
                                     } else {
                                       // Remove packaging type
                                       const updatedPackaging = packagingArray.filter(p => p !== packagingType);
                                       updateFoodDetail(index, 'packaged', updatedPackaging.length > 0);
-                                      updateFoodDetail(index, 'packaging', updatedPackaging.length > 0 ? updatedPackaging : null);
+                                      updateFoodDetail(index, 'packaging_type', updatedPackaging.length > 0 ? updatedPackaging : null);
                                     }
                                   }
                                 }}
