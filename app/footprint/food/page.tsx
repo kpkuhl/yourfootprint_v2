@@ -55,6 +55,7 @@ export default function FoodPage() {
     quantity?: string;
     category?: string;
     packaging?: string | string[];
+    CI_custom?: number | null;
   }>>([]);
 
   // Fetch household ID for the user
@@ -470,6 +471,7 @@ export default function FoodPage() {
     quantity?: string;
     category?: string;
     packaging?: string | string[];
+    CI_custom?: number | null;
   }) => {
     setFoodDetails(prev => [...prev, {
       household_id: householdId || '',
@@ -479,7 +481,7 @@ export default function FoodPage() {
       packaged: Array.isArray(extractedItem.packaging) 
         ? extractedItem.packaging.some(p => p !== 'none')
         : (extractedItem.packaging && extractedItem.packaging !== 'none'),
-      CI_custom: null,
+      CI_custom: extractedItem.CI_custom || null,
       co2e_kg: 0,
       food_entry_id: 0
     }]);
@@ -497,7 +499,7 @@ export default function FoodPage() {
       packaged: Array.isArray(item.packaging) 
         ? item.packaging.some(p => p !== 'none')
         : (item.packaging && item.packaging !== 'none'),
-      CI_custom: null,
+      CI_custom: item.CI_custom || null,
       co2e_kg: 0,
       food_entry_id: 0
     }));
@@ -742,6 +744,33 @@ export default function FoodPage() {
                               </div>
                             </div>
                           </div>
+                          
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Custom Carbon Intensity (kg CO2e/kg)
+                            </label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={item.CI_custom || ''}
+                              onChange={(e) => {
+                                const newItems = [...extractedItems];
+                                newItems[index] = {
+                                  ...newItems[index],
+                                  CI_custom: e.target.value ? Number(e.target.value) : null
+                                };
+                                setExtractedItems(newItems);
+                              }}
+                              placeholder="Leave empty for default"
+                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                              Override default category values if you have more accurate data
+                            </p>
+                            <p className="text-xs text-gray-400 mt-1">
+                              Typical ranges: Meat (10-50), Dairy (1-5), Produce (0.1-2), Grains (0.5-3), Processed (1-8)
+                            </p>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -852,6 +881,12 @@ export default function FoodPage() {
                           onChange={(e) => updateFoodDetail(index, 'CI_custom', e.target.value ? Number(e.target.value) : null)}
                           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                         />
+                        <p className="mt-1 text-sm text-gray-500">
+                          Override default category values if you have more accurate data
+                        </p>
+                        <p className="mt-1 text-sm text-gray-400">
+                          Typical ranges: Meat (10-50), Dairy (1-5), Produce (0.1-2), Grains (0.5-3), Processed (1-8)
+                        </p>
                       </div>
                     </div>
                   ))}
