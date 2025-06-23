@@ -27,6 +27,11 @@ type FoodDetail = {
   kg_food: number | null;
 };
 
+type DefaultCI = {
+  category: string;
+  CI_kg_kg: number;
+};
+
 const STORAGE_KEY = 'foodFormData';
 
 export default function FoodPage() {
@@ -58,6 +63,7 @@ export default function FoodPage() {
     packaging?: string | string[];
     CI_custom?: number | null;
   }>>([]);
+  const [defaultCIValues, setDefaultCIValues] = useState<DefaultCI[]>([]);
 
   // Fetch household ID for the user
   useEffect(() => {
@@ -121,6 +127,52 @@ export default function FoodPage() {
 
     fetchFoodEntries();
   }, [user, householdId]);
+
+  // Fetch default carbon intensity values
+  useEffect(() => {
+    const fetchDefaultCI = async () => {
+      const { data, error } = await supabase
+        .from('CI_food_default_kg')
+        .select('category, CI_kg_kg')
+        .order('category');
+
+      if (error) {
+        console.error('Error fetching default CI values:', error);
+        return;
+      }
+
+      setDefaultCIValues(data || []);
+    };
+
+    fetchDefaultCI();
+  }, []);
+
+  // Function to get carbon intensity for a food item
+  const getCarbonIntensity = (category: string | null, customCI: number | null): number => {
+    // If custom CI is provided, use it
+    if (customCI !== null) {
+      return customCI;
+    }
+
+    // If no category, use a default value
+    if (!category) {
+      return 2.0; // Default moderate carbon intensity
+    }
+
+    // Find the default CI for the category
+    const defaultCI = defaultCIValues.find(ci => ci.category === category);
+    return defaultCI ? defaultCI.CI_kg_kg : 2.0; // Fallback to moderate default
+  };
+
+  // Function to calculate CO2e for a food item
+  const calculateFoodCO2e = (kgFood: number | null, category: string | null, customCI: number | null): number => {
+    if (!kgFood || kgFood <= 0) {
+      return 0;
+    }
+
+    const carbonIntensity = getCarbonIntensity(category, customCI);
+    return kgFood * carbonIntensity;
+  };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -406,7 +458,7 @@ export default function FoodPage() {
   };
 
   const addFoodDetail = () => {
-    setFoodDetails(prev => [...prev, {
+    const newDetail: FoodDetail = {
       household_id: householdId || '',
       date: foodEntry.date,
       item: '',
@@ -414,19 +466,28 @@ export default function FoodPage() {
       packaged: false,
       packaging_type: null,
       CI_custom: null,
-      co2e_kg: 0,
+      co2e_kg: 0, // Will be calculated when kg_food is set
       food_entry_id: 0,
       kg_food: null
-    }]);
+    };
+    setFoodDetails(prev => [...prev, newDetail]);
   };
 
   const updateFoodDetail = (index: number, field: keyof FoodDetail, value: any) => {
     setFoodDetails(prev => {
       const updated = [...prev];
-      updated[index] = {
-        ...updated[index],
-        [field]: value
-      };
+      updated[index] = { ...updated[index], [field]: value };
+      
+      // Recalculate CO2e if kg_food, category, or CI_custom changed
+      if (field === 'kg_food' || field === 'category' || field === 'CI_custom') {
+        const detail = updated[index];
+        updated[index].co2e_kg = calculateFoodCO2e(
+          detail.kg_food, 
+          detail.category, 
+          detail.CI_custom
+        );
+      }
+      
       return updated;
     });
   };
@@ -576,6 +637,9 @@ export default function FoodPage() {
     packaging?: string | string[];
     CI_custom?: number | null;
   }) => {
+    const kgFood = extractedItem.quantity ? parseFloat(extractedItem.quantity) : null;
+    const co2e_kg = calculateFoodCO2e(kgFood, extractedItem.category || null, extractedItem.CI_custom || null);
+
     setFoodDetails(prev => [...prev, {
       household_id: householdId || '',
       date: foodEntry.date,
@@ -586,9 +650,9 @@ export default function FoodPage() {
         : (extractedItem.packaging && extractedItem.packaging !== 'none'),
       packaging_type: Array.isArray(extractedItem.packaging) ? extractedItem.packaging : null,
       CI_custom: extractedItem.CI_custom || null,
-      co2e_kg: 0,
+      co2e_kg,
       food_entry_id: 0,
-      kg_food: extractedItem.quantity ? parseFloat(extractedItem.quantity) : null
+      kg_food: kgFood
     }]);
     
     // Remove the item from extracted items after adding it
@@ -596,20 +660,25 @@ export default function FoodPage() {
   };
 
   const addAllExtractedItems = () => {
-    const newFoodDetails = extractedItems.map(item => ({
-      household_id: householdId || '',
-      date: foodEntry.date,
-      item: item.item,
-      category: item.category || null,
-      packaged: Array.isArray(item.packaging) 
-        ? item.packaging.some(p => p !== 'none')
-        : (item.packaging && item.packaging !== 'none'),
-      packaging_type: Array.isArray(item.packaging) ? item.packaging : null,
-      CI_custom: item.CI_custom || null,
-      co2e_kg: 0,
-      food_entry_id: 0,
-      kg_food: item.quantity ? parseFloat(item.quantity) : null
-    }));
+    const newFoodDetails = extractedItems.map(item => {
+      const kgFood = item.quantity ? parseFloat(item.quantity) : null;
+      const co2e_kg = calculateFoodCO2e(kgFood, item.category || null, item.CI_custom || null);
+
+      return {
+        household_id: householdId || '',
+        date: foodEntry.date,
+        item: item.item,
+        category: item.category || null,
+        packaged: Array.isArray(item.packaging) 
+          ? item.packaging.some(p => p !== 'none')
+          : (item.packaging && item.packaging !== 'none'),
+        packaging_type: Array.isArray(item.packaging) ? item.packaging : null,
+        CI_custom: item.CI_custom || null,
+        co2e_kg,
+        food_entry_id: 0,
+        kg_food: kgFood
+      };
+    });
     
     setFoodDetails(prev => [...prev, ...newFoodDetails]);
     setExtractedItems([]);
@@ -1050,9 +1119,35 @@ export default function FoodPage() {
                           Typical ranges: Beef (20-60), Meat (10-30), Dairy (1-5), Produce (0.1-2), Grains (0.5-3), Processed (1-8)
                         </p>
                       </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Calculated CO2e (kg)
+                        </label>
+                        <div className="mt-1 p-2 bg-gray-50 border border-gray-300 rounded-md">
+                          <span className="text-lg font-semibold text-indigo-600">
+                            {detail.co2e_kg.toFixed(3)} kg CO2e
+                          </span>
+                        </div>
+                        <p className="mt-1 text-sm text-gray-500">
+                          Based on quantity × carbon intensity
+                        </p>
+                      </div>
                     </div>
                   ))}
                 </div>
+
+                {foodDetails.length > 0 && (
+                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <h3 className="text-lg font-semibold text-blue-800 mb-2">Total Carbon Footprint</h3>
+                    <div className="text-2xl font-bold text-blue-600">
+                      {foodDetails.reduce((sum, detail) => sum + detail.co2e_kg, 0).toFixed(3)} kg CO2e
+                    </div>
+                    <p className="text-sm text-blue-600 mt-1">
+                      Combined carbon footprint of all {foodDetails.length} food item{foodDetails.length !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                )}
 
                 {error && (
                   <div className="text-red-500 text-sm">{error}</div>
