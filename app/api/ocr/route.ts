@@ -54,28 +54,64 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { imageUrl } = await request.json();
+    const { imageUrl, imageData, imageType } = await request.json();
 
-    if (!imageUrl) {
-      console.error('No image URL provided');
-      return NextResponse.json({ error: 'Image URL is required' }, { status: 400 });
+    if (!imageData && !imageUrl) {
+      console.error('No image data or URL provided');
+      return NextResponse.json({ error: 'Image data or URL is required' }, { status: 400 });
     }
 
-    console.log('Processing OCR for image:', imageUrl);
+    let imageSource: any;
 
-    // Validate the image URL
-    if (!imageUrl.startsWith('http') && !imageUrl.startsWith('blob:')) {
-      console.error('Invalid image URL format:', imageUrl);
-      return NextResponse.json({ error: 'Invalid image URL format' }, { status: 400 });
+    if (imageData) {
+      // Handle base64 image data
+      console.log('Processing OCR for base64 image data...');
+      console.log('Image type:', imageType);
+      
+      imageSource = {
+        content: imageData
+      };
+    } else if (imageUrl) {
+      // Handle image URL (fallback)
+      console.log('Processing OCR for image URL:', imageUrl);
+
+      // Validate the image URL
+      if (!imageUrl.startsWith('http') && !imageUrl.startsWith('blob:')) {
+        console.error('Invalid image URL format:', imageUrl);
+        return NextResponse.json({ error: 'Invalid image URL format' }, { status: 400 });
+      }
+
+      // Check if the image is accessible (for non-blob URLs)
+      if (imageUrl.startsWith('http')) {
+        try {
+          console.log('Checking if image is accessible...');
+          const imageResponse = await fetch(imageUrl, { method: 'HEAD' });
+          console.log('Image accessibility check status:', imageResponse.status);
+          if (!imageResponse.ok) {
+            console.error('Image not accessible:', imageResponse.status, imageResponse.statusText);
+            return NextResponse.json({ error: 'Image not accessible' }, { status: 400 });
+          }
+        } catch (error) {
+          console.error('Error checking image accessibility:', error);
+          return NextResponse.json({ error: 'Cannot access image' }, { status: 400 });
+        }
+      }
+
+      imageSource = {
+        source: {
+          imageUri: imageUrl
+        }
+      };
     }
 
     // Perform OCR on the image
     console.log('Calling Google Cloud Vision API...');
-    const [result] = await client.textDetection(imageUrl);
+    const [result] = await client.textDetection(imageSource);
     console.log('Google Cloud Vision API response received');
     
     const detections = result.textAnnotations || [];
     console.log('Number of text detections:', detections.length);
+    console.log('Raw detection result:', JSON.stringify(result, null, 2));
 
     if (detections.length === 0) {
       console.log('No text detected in the image');

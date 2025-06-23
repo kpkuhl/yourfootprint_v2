@@ -342,19 +342,37 @@ export default function FoodPage() {
     }
   };
 
-  const processReceiptOCR = async (imageUrl: string) => {
+  const processReceiptOCR = async (file: File) => {
     setProcessingOCR(true);
     setError(null);
     
     try {
-      console.log('Sending OCR request for image URL:', imageUrl);
+      console.log('Converting file to base64 for OCR processing...');
+      
+      // Convert file to base64
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          // Remove the data:image/...;base64, prefix
+          const base64Data = result.split(',')[1];
+          resolve(base64Data);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      console.log('Sending OCR request with base64 image data...');
       
       const response = await fetch('/api/ocr', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ imageUrl }),
+        body: JSON.stringify({ 
+          imageData: base64,
+          imageType: file.type 
+        }),
       });
 
       console.log('OCR API response status:', response.status);
@@ -483,9 +501,7 @@ export default function FoodPage() {
                       <button
                         type="button"
                         onClick={() => {
-                          // Create a temporary URL for the selected file
-                          const tempUrl = URL.createObjectURL(selectedFile);
-                          processReceiptOCR(tempUrl);
+                          processReceiptOCR(selectedFile);
                         }}
                         disabled={processingOCR}
                         className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
