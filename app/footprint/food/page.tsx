@@ -688,7 +688,7 @@ export default function FoodPage() {
                               <input
                                 type="number"
                                 min="0.1"
-                                step="0.1"
+                                step="0.001"
                                 value={item.quantity || ''}
                                 onChange={(e) => {
                                   const newItems = [...extractedItems];
@@ -874,7 +874,7 @@ export default function FoodPage() {
                         </label>
                         <input
                           type="number"
-                          step="0.01"
+                          step="0.001"
                           min="0.01"
                           value={detail.kg_food || ''}
                           onChange={(e) => updateFoodDetail(index, 'kg_food', e.target.value ? parseFloat(e.target.value) : null)}
