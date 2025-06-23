@@ -20,6 +20,7 @@ type FoodDetail = {
   item: string;
   category: string | null;
   packaged: boolean;
+  packaging?: string | string[] | null;
   CI_custom: number | null;
   co2e_kg: number;
   food_entry_id: number;
@@ -53,7 +54,7 @@ export default function FoodPage() {
     price?: string;
     quantity?: string;
     category?: string;
-    packaging?: string;
+    packaging?: string | string[];
   }>>([]);
 
   // Fetch household ID for the user
@@ -302,20 +303,16 @@ export default function FoodPage() {
   };
 
   const addFoodDetail = () => {
-    if (!householdId) {
-      console.error('Cannot add food detail: household ID is missing');
-      return;
-    }
-    
     setFoodDetails(prev => [...prev, {
-      household_id: householdId,
+      household_id: householdId || '',
       date: foodEntry.date,
       item: '',
       category: null,
       packaged: false,
+      packaging: null,
       CI_custom: null,
       co2e_kg: 0,
-      food_entry_id: 0 // Will be set when the entry is created
+      food_entry_id: 0
     }]);
   };
 
@@ -472,14 +469,16 @@ export default function FoodPage() {
     price?: string;
     quantity?: string;
     category?: string;
-    packaging?: string;
+    packaging?: string | string[];
   }) => {
     setFoodDetails(prev => [...prev, {
       household_id: householdId || '',
       date: foodEntry.date,
       item: extractedItem.item,
       category: extractedItem.category || null,
-      packaged: extractedItem.packaging && extractedItem.packaging !== 'none',
+      packaged: Array.isArray(extractedItem.packaging) 
+        ? extractedItem.packaging.some(p => p !== 'none')
+        : (extractedItem.packaging && extractedItem.packaging !== 'none'),
       CI_custom: null,
       co2e_kg: 0,
       food_entry_id: 0
@@ -490,19 +489,21 @@ export default function FoodPage() {
   };
 
   const addAllExtractedItems = () => {
-    const itemsToAdd = extractedItems.map(extractedItem => ({
+    const newFoodDetails = extractedItems.map(item => ({
       household_id: householdId || '',
       date: foodEntry.date,
-      item: extractedItem.item,
-      category: extractedItem.category || null,
-      packaged: extractedItem.packaging && extractedItem.packaging !== 'none',
+      item: item.item,
+      category: item.category || null,
+      packaged: Array.isArray(item.packaging) 
+        ? item.packaging.some(p => p !== 'none')
+        : (item.packaging && item.packaging !== 'none'),
       CI_custom: null,
       co2e_kg: 0,
       food_entry_id: 0
     }));
     
-    setFoodDetails(prev => [...prev, ...itemsToAdd]);
-    setExtractedItems([]); // Clear all extracted items
+    setFoodDetails(prev => [...prev, ...newFoodDetails]);
+    setExtractedItems([]);
   };
 
   if (!user) {
@@ -693,27 +694,52 @@ export default function FoodPage() {
                               <label className="block text-xs font-medium text-gray-700 mb-1">
                                 Packaging
                               </label>
-                              <select
-                                value={item.packaging || ''}
-                                onChange={(e) => {
-                                  const newItems = [...extractedItems];
-                                  newItems[index] = {
-                                    ...newItems[index],
-                                    packaging: e.target.value
-                                  };
-                                  setExtractedItems(newItems);
-                                }}
-                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                              >
-                                <option value="">Select packaging</option>
-                                <option value="none">None</option>
-                                <option value="glass">Glass</option>
-                                <option value="plastic">Plastic</option>
-                                <option value="steel">Steel</option>
-                                <option value="aluminum">Aluminum</option>
-                                <option value="paper">Paper</option>
-                                <option value="wood">Wood</option>
-                              </select>
+                              <div className="space-y-1 max-h-24 overflow-y-auto">
+                                {['none', 'glass', 'plastic', 'steel', 'aluminum', 'paper', 'wood'].map((packagingType) => (
+                                  <label key={packagingType} className="flex items-center">
+                                    <input
+                                      type="checkbox"
+                                      checked={item.packaging?.includes(packagingType) || false}
+                                      onChange={(e) => {
+                                        const newItems = [...extractedItems];
+                                        const currentPackaging = newItems[index].packaging || [];
+                                        const packagingArray = Array.isArray(currentPackaging) ? currentPackaging : [];
+                                        
+                                        if (e.target.checked) {
+                                          // Add packaging type
+                                          if (packagingType === 'none') {
+                                            // If "none" is selected, clear all others
+                                            newItems[index] = {
+                                              ...newItems[index],
+                                              packaging: ['none']
+                                            };
+                                          } else {
+                                            // Add the packaging type and remove "none" if it was selected
+                                            const updatedPackaging = packagingArray.filter(p => p !== 'none');
+                                            if (!updatedPackaging.includes(packagingType)) {
+                                              updatedPackaging.push(packagingType);
+                                            }
+                                            newItems[index] = {
+                                              ...newItems[index],
+                                              packaging: updatedPackaging
+                                            };
+                                          }
+                                        } else {
+                                          // Remove packaging type
+                                          const updatedPackaging = packagingArray.filter(p => p !== packagingType);
+                                          newItems[index] = {
+                                            ...newItems[index],
+                                            packaging: updatedPackaging.length > 0 ? updatedPackaging : ['none']
+                                          };
+                                        }
+                                        setExtractedItems(newItems);
+                                      }}
+                                      className="h-3 w-3 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mr-2"
+                                    />
+                                    <span className="text-xs text-gray-700 capitalize">{packagingType}</span>
+                                  </label>
+                                ))}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -771,19 +797,48 @@ export default function FoodPage() {
                         <label className="block text-sm font-medium text-gray-700">
                           Packaging
                         </label>
-                        <select
-                          value={detail.packaged ? 'plastic' : 'none'}
-                          onChange={(e) => updateFoodDetail(index, 'packaged', e.target.value !== 'none')}
-                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                        >
-                          <option value="none">None</option>
-                          <option value="glass">Glass</option>
-                          <option value="plastic">Plastic</option>
-                          <option value="steel">Steel</option>
-                          <option value="aluminum">Aluminum</option>
-                          <option value="paper">Paper</option>
-                          <option value="wood">Wood</option>
-                        </select>
+                        <div className="space-y-2 mt-2">
+                          {['none', 'glass', 'plastic', 'steel', 'aluminum', 'paper', 'wood'].map((packagingType) => (
+                            <label key={packagingType} className="flex items-center">
+                              <input
+                                type="checkbox"
+                                checked={
+                                  packagingType === 'none' 
+                                    ? !detail.packaged 
+                                    : (Array.isArray(detail.packaging) 
+                                        ? detail.packaging.includes(packagingType)
+                                        : detail.packaging === packagingType)
+                                }
+                                onChange={(e) => {
+                                  const currentPackaging = detail.packaging || [];
+                                  const packagingArray = Array.isArray(currentPackaging) ? currentPackaging : [];
+                                  
+                                  if (packagingType === 'none') {
+                                    updateFoodDetail(index, 'packaged', !e.target.checked);
+                                    updateFoodDetail(index, 'packaging', null);
+                                  } else {
+                                    if (e.target.checked) {
+                                      // Add packaging type
+                                      const updatedPackaging = packagingArray.filter(p => p !== 'none');
+                                      if (!updatedPackaging.includes(packagingType)) {
+                                        updatedPackaging.push(packagingType);
+                                      }
+                                      updateFoodDetail(index, 'packaged', true);
+                                      updateFoodDetail(index, 'packaging', updatedPackaging);
+                                    } else {
+                                      // Remove packaging type
+                                      const updatedPackaging = packagingArray.filter(p => p !== packagingType);
+                                      updateFoodDetail(index, 'packaged', updatedPackaging.length > 0);
+                                      updateFoodDetail(index, 'packaging', updatedPackaging.length > 0 ? updatedPackaging : null);
+                                    }
+                                  }
+                                }}
+                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mr-2"
+                              />
+                              <span className="text-sm text-gray-700 capitalize">{packagingType}</span>
+                            </label>
+                          ))}
+                        </div>
                       </div>
 
                       <div>
