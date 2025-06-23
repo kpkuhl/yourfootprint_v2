@@ -218,6 +218,7 @@ function parseReceiptText(text: string): Array<{
     const trimmedLine = line.trim();
     
     console.log(`Processing line: "${trimmedLine}"`);
+    console.log(`Line length: ${trimmedLine.length}, contains price pattern: ${/(\$?\d+\.\d{2})/.test(trimmedLine)}`);
     
     // Skip header/footer lines
     if (trimmedLine.toLowerCase().includes('total') || 
@@ -255,15 +256,24 @@ function parseReceiptText(text: string): Array<{
         price = separatedPriceMatch[2];
         console.log(`Found separated price: "${price}" in line: "${trimmedLine}"`);
       } else {
-        // Fall back to finding any price in the line, but be more careful
-        // Look for prices that are at least 3 characters from the start (to avoid item codes)
-        const priceMatch = trimmedLine.match(/(\$?\d+\.\d{2})/);
-        if (priceMatch) {
-          const priceIndex = trimmedLine.indexOf(priceMatch[0]);
-          // Only use this price if it's not at the very beginning (likely an item code)
-          if (priceIndex > 3) {
-            price = priceMatch[0];
-            console.log(`Found price with fallback: "${price}" in line: "${trimmedLine}"`);
+        // More flexible approach: find any price pattern in the line
+        // but prioritize prices that appear after some text
+        const allPriceMatches = trimmedLine.match(/(\$?\d+\.\d{2})/g);
+        if (allPriceMatches && allPriceMatches.length > 0) {
+          // If there are multiple prices, take the last one (most likely to be the actual price)
+          price = allPriceMatches[allPriceMatches.length - 1];
+          console.log(`Found price from multiple matches: "${price}" in line: "${trimmedLine}"`);
+        } else {
+          // Fall back to finding any price in the line, but be more careful
+          // Look for prices that are at least 3 characters from the start (to avoid item codes)
+          const priceMatch = trimmedLine.match(/(\$?\d+\.\d{2})/);
+          if (priceMatch) {
+            const priceIndex = trimmedLine.indexOf(priceMatch[0]);
+            // Only use this price if it's not at the very beginning (likely an item code)
+            if (priceIndex > 3) {
+              price = priceMatch[0];
+              console.log(`Found price with fallback: "${price}" in line: "${trimmedLine}"`);
+            }
           }
         }
       }
@@ -304,6 +314,14 @@ function parseReceiptText(text: string): Array<{
     itemName = itemName.replace(/^\d+[A-Z]*\s*/, '').trim(); // Remove leading numbers and item codes
     itemName = itemName.replace(/^\d+\.\d+\s*/, '').trim(); // Remove leading decimal numbers
     itemName = itemName.replace(/\s+/g, ' ').trim(); // Normalize whitespace
+
+    // For items with text between name and price, take only the first meaningful word/phrase
+    // This handles cases like "BANANA ORGANIC 2.99" -> "BANANA"
+    const firstWordMatch = itemName.match(/^([A-Za-z]+)/);
+    if (firstWordMatch && firstWordMatch[1].length >= 3) {
+      itemName = firstWordMatch[1];
+      console.log(`Extracted first word as item name: "${itemName}" from "${trimmedLine}"`);
+    }
 
     // Skip lines that are mostly numbers or codes
     if (itemName.length < 3 || /^\d+$/.test(itemName)) {
