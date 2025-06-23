@@ -67,9 +67,12 @@ export async function POST(request: NextRequest) {
       // Handle base64 image data
       console.log('Processing OCR for base64 image data...');
       console.log('Image type:', imageType);
+      console.log('Base64 data length:', imageData.length);
       
       imageSource = {
-        content: imageData
+        image: {
+          content: imageData
+        }
       };
     } else if (imageUrl) {
       // Handle image URL (fallback)
@@ -98,14 +101,17 @@ export async function POST(request: NextRequest) {
       }
 
       imageSource = {
-        source: {
-          imageUri: imageUrl
+        image: {
+          source: {
+            imageUri: imageUrl
+          }
         }
       };
     }
 
     // Perform OCR on the image
     console.log('Calling Google Cloud Vision API...');
+    console.log('Image source structure:', JSON.stringify(imageSource, null, 2));
     const [result] = await client.textDetection(imageSource);
     console.log('Google Cloud Vision API response received');
     

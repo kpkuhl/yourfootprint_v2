@@ -356,9 +356,15 @@ export default function FoodPage() {
           const result = reader.result as string;
           // Remove the data:image/...;base64, prefix
           const base64Data = result.split(',')[1];
+          console.log('File converted to base64, length:', base64Data.length);
+          console.log('File type:', file.type);
+          console.log('File size:', file.size);
           resolve(base64Data);
         };
-        reader.onerror = reject;
+        reader.onerror = (error) => {
+          console.error('Error reading file:', error);
+          reject(error);
+        };
         reader.readAsDataURL(file);
       });
 
