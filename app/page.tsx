@@ -232,6 +232,7 @@ export default function Home() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-24">
         <h1 className="text-4xl font-bold mb-8">Welcome to Your Footprint</h1>
+        <p className="text-lg mb-8">A calculator to estimate your household's greenhouse gas emissions</p>
         <p className="text-lg mb-8">Please sign in to view your carbon footprint data.</p>
         <Link
           href="/auth/login"
@@ -239,6 +240,9 @@ export default function Home() {
         >
           Sign In
         </Link>
+        <p className="text-red-600 text-sm mt-8 text-center max-w-md">
+          This is a personal project in the alpha stage of development. If this is a tool you are interested in using in the future or you have any feedback, please contact me at hello@yourfootprint.house.
+        </p>
       </div>
     );
   }
