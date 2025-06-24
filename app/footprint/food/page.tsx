@@ -753,14 +753,14 @@ export default function FoodPage() {
 
                 <div>
                   <label htmlFor="image" className="block text-sm font-medium text-gray-700">
-                    Receipt Image (Optional)
+                    Image (optional)
                   </label>
                   <input
                     type="file"
                     id="image"
                     accept="image/*"
                     onChange={handleFileSelect}
-                    className="mt-1 block w-full"
+                    className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
                   />
                   {selectedFile && (
                     <div className="mt-2">
