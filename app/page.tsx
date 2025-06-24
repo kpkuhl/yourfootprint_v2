@@ -251,7 +251,7 @@ export default function Home() {
           Sign In
         </Link>
         <p className="text-red-600 text-sm mt-8 text-center max-w-md">
-          This is a personal project in the alpha stage of development. If this is a tool you are interested in using in the future or you have any feedback, please contact me at hello@yourfootprint.house.
+          This is a personal project in the alpha stage of development, obviously use at your own risk. If this is a tool you are interested in using in the future or you have any feedback, please contact me at hello@yourfootprint.house.
         </p>
       </div>
     );
