@@ -1,6 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ImageAnnotatorClient } from '@google-cloud/vision';
 
+// Simple in-memory rate limiter
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+
+const RATE_LIMIT_WINDOW = 5 * 60 * 1000; // 5 minutes in milliseconds
+const MAX_REQUESTS = 1; // 1 request per window
+
+function checkRateLimit(ip: string): { allowed: boolean; remaining: number; resetTime: number } {
+  const now = Date.now();
+  const userLimit = rateLimitMap.get(ip);
+
+  if (!userLimit || now > userLimit.resetTime) {
+    // First request or window expired
+    rateLimitMap.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
+    return { allowed: true, remaining: MAX_REQUESTS - 1, resetTime: now + RATE_LIMIT_WINDOW };
+  }
+
+  if (userLimit.count >= MAX_REQUESTS) {
+    // Rate limit exceeded
+    return { allowed: false, remaining: 0, resetTime: userLimit.resetTime };
+  }
+
+  // Increment count
+  userLimit.count++;
+  rateLimitMap.set(ip, userLimit);
+  return { allowed: true, remaining: MAX_REQUESTS - userLimit.count, resetTime: userLimit.resetTime };
+}
+
 // Initialize the Google Cloud Vision client
 let client: ImageAnnotatorClient;
 
@@ -31,6 +58,31 @@ try {
 }
 
 export async function POST(request: NextRequest) {
+  // Get client IP for rate limiting
+  const forwarded = request.headers.get('x-forwarded-for');
+  const ip = forwarded ? forwarded.split(',')[0] : 'unknown';
+  
+  // Check rate limit
+  const rateLimit = checkRateLimit(ip);
+  
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { 
+        error: 'Rate limit exceeded. Please wait before making another request.',
+        resetTime: new Date(rateLimit.resetTime).toISOString()
+      },
+      { 
+        status: 429,
+        headers: {
+          'X-RateLimit-Limit': MAX_REQUESTS.toString(),
+          'X-RateLimit-Remaining': rateLimit.remaining.toString(),
+          'X-RateLimit-Reset': new Date(rateLimit.resetTime).toISOString(),
+          'Retry-After': Math.ceil((rateLimit.resetTime - Date.now()) / 1000).toString()
+        }
+      }
+    );
+  }
+
   try {
     if (!client) {
       return NextResponse.json(
@@ -105,6 +157,12 @@ export async function POST(request: NextRequest) {
       success: true,
       fullText,
       extractedItems
+    }, {
+      headers: {
+        'X-RateLimit-Limit': MAX_REQUESTS.toString(),
+        'X-RateLimit-Remaining': rateLimit.remaining.toString(),
+        'X-RateLimit-Reset': new Date(rateLimit.resetTime).toISOString()
+      }
     });
 
   } catch (error) {

@@ -806,7 +806,11 @@ export default function FoodPage() {
       
       const data = await response.json();
 
-      if (data.success) {
+      if (response.status === 429) {
+        // Rate limit exceeded
+        const resetTime = data.resetTime ? new Date(data.resetTime).toLocaleString() : '5 minutes';
+        setError(`Rate limit exceeded. You can only process 1 image every 5 minutes. Please try again after ${resetTime}.`);
+      } else if (data.success) {
         setExtractedItems(data.extractedItems);
       } else {
         setError(`OCR processing failed: ${data.error}${data.details ? ` - ${data.details}` : ''}`);
