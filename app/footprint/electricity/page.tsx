@@ -14,6 +14,7 @@ import {
   Tooltip,
   Legend
 } from 'chart.js';
+import { encryptHouseholdId, decryptHouseholdId } from '../../../utils/encryption';
 
 ChartJS.register(
   CategoryScale,
@@ -113,8 +114,13 @@ export default function ElectricityPage() {
       if (savedData) {
         try {
           const parsedData = JSON.parse(savedData);
-          setElectricityData(parsedData);
-          setInputAmount(parsedData.amount_kWh);
+          // Decrypt the household ID when loading
+          const decryptedData = {
+            ...parsedData,
+            household_id: decryptHouseholdId(parsedData.household_id)
+          };
+          setElectricityData(decryptedData);
+          setInputAmount(decryptedData.amount_kWh);
           setInputUnit('kWh');
         } catch (e) {
           console.error('Error parsing saved form data:', e);
@@ -145,7 +151,12 @@ export default function ElectricityPage() {
   // Save form data to localStorage whenever it changes
   useEffect(() => {
     if (typeof window !== 'undefined' && electricityData.household_id) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(electricityData));
+      // Encrypt the household ID before storing
+      const dataToStore = {
+        ...electricityData,
+        household_id: encryptHouseholdId(electricityData.household_id)
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToStore));
     }
   }, [electricityData]);
 

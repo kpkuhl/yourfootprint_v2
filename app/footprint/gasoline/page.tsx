@@ -14,6 +14,7 @@ import {
   Tooltip,
   Legend
 } from 'chart.js';
+import { encryptHouseholdId, decryptHouseholdId } from '../../../utils/encryption';
 
 ChartJS.register(
   CategoryScale,
@@ -72,7 +73,12 @@ export default function GasolinePage() {
       if (savedData) {
         try {
           const parsedData = JSON.parse(savedData);
-          setGasolineData(parsedData);
+          // Decrypt the household ID when loading
+          const decryptedData = {
+            ...parsedData,
+            household_id: decryptHouseholdId(parsedData.household_id)
+          };
+          setGasolineData(decryptedData);
         } catch (e) {
           console.error('Error parsing saved form data:', e);
         }
@@ -83,7 +89,12 @@ export default function GasolinePage() {
   // Save form data to localStorage whenever it changes
   useEffect(() => {
     if (typeof window !== 'undefined' && gasolineData.household_id) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(gasolineData));
+      // Encrypt the household ID before storing
+      const dataToStore = {
+        ...gasolineData,
+        household_id: encryptHouseholdId(gasolineData.household_id)
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToStore));
     }
   }, [gasolineData]);
 

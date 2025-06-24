@@ -14,6 +14,7 @@ import {
   Tooltip,
   Legend
 } from 'chart.js';
+import { encryptHouseholdId, decryptHouseholdId } from '../../../utils/encryption';
 
 ChartJS.register(
   CategoryScale,
@@ -113,8 +114,13 @@ export default function WaterPage() {
       if (savedData) {
         try {
           const parsedData = JSON.parse(savedData);
-          setWaterData(parsedData);
-          setInputAmount(parsedData.amount_gal);
+          // Decrypt the household ID when loading
+          const decryptedData = {
+            ...parsedData,
+            household_id: decryptHouseholdId(parsedData.household_id)
+          };
+          setWaterData(decryptedData);
+          setInputAmount(decryptedData.amount_gal);
           setInputUnit('gallons');
         } catch (e) {
           console.error('Error parsing saved form data:', e);
@@ -145,7 +151,12 @@ export default function WaterPage() {
   // Save form data to localStorage whenever it changes
   useEffect(() => {
     if (typeof window !== 'undefined' && waterData.household_id) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(waterData));
+      // Encrypt the household ID before storing
+      const dataToStore = {
+        ...waterData,
+        household_id: encryptHouseholdId(waterData.household_id)
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToStore));
     }
   }, [waterData]);
 

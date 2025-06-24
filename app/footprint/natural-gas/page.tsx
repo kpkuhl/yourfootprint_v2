@@ -14,6 +14,7 @@ import {
   Tooltip,
   Legend
 } from 'chart.js';
+import { encryptHouseholdId, decryptHouseholdId } from '../../../utils/encryption';
 
 ChartJS.register(
   CategoryScale,
@@ -113,8 +114,13 @@ export default function NaturalGasPage() {
       if (savedData) {
         try {
           const parsedData = JSON.parse(savedData);
-          setNaturalGasData(parsedData);
-          setInputAmount(parsedData.amount_therm);
+          // Decrypt the household ID when loading
+          const decryptedData = {
+            ...parsedData,
+            household_id: decryptHouseholdId(parsedData.household_id)
+          };
+          setNaturalGasData(decryptedData);
+          setInputAmount(decryptedData.amount_therm);
           setInputUnit('therms');
         } catch (e) {
           console.error('Error parsing saved form data:', e);
@@ -145,7 +151,12 @@ export default function NaturalGasPage() {
   // Save form data to localStorage whenever it changes
   useEffect(() => {
     if (typeof window !== 'undefined' && naturalGasData.household_id) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(naturalGasData));
+      // Encrypt the household ID before storing
+      const dataToStore = {
+        ...naturalGasData,
+        household_id: encryptHouseholdId(naturalGasData.household_id)
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToStore));
     }
   }, [naturalGasData]);
 

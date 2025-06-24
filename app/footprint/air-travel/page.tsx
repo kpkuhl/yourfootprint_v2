@@ -14,6 +14,7 @@ import {
   Tooltip,
   Legend
 } from 'chart.js';
+import { encryptHouseholdId, decryptHouseholdId } from '../../../utils/encryption';
 
 ChartJS.register(
   CategoryScale,
@@ -86,7 +87,12 @@ export default function AirTravelPage() {
       if (savedData) {
         try {
           const parsedData = JSON.parse(savedData);
-          setAirTravelData(parsedData);
+          // Decrypt the household ID when loading
+          const decryptedData = {
+            ...parsedData,
+            household_id: decryptHouseholdId(parsedData.household_id)
+          };
+          setAirTravelData(decryptedData);
         } catch (e) {
           console.error('Error parsing saved form data:', e);
         }
@@ -97,7 +103,12 @@ export default function AirTravelPage() {
   // Save form data to localStorage whenever it changes
   useEffect(() => {
     if (typeof window !== 'undefined' && airTravelData.household_id) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(airTravelData));
+      // Encrypt the household ID before storing
+      const dataToStore = {
+        ...airTravelData,
+        household_id: encryptHouseholdId(airTravelData.household_id)
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToStore));
     }
   }, [airTravelData]);
 
