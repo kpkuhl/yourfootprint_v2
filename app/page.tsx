@@ -182,7 +182,7 @@ export default function Home() {
       userData?.water ? 'Water' : 'Water (avg US)',
       userData?.gasoline ? 'Gasoline' : 'Gasoline (avg US)',
       userData?.air_travel ? 'Air Travel' : 'Air Travel (avg US)',
-      calculatedFoodCO2e !== null ? 'Food (calculated)' : (userData?.food ? 'Food' : 'Food (avg US)'),
+      userData?.food ? 'Food' : 'Food (avg US)',
       userData?.stuff ? 'Stuff' : 'Stuff (avg US)',
       userData?.services ? 'Services' : 'Services (avg US)'
     ],
