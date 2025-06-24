@@ -737,15 +737,18 @@ export default function FoodPage() {
                   <label htmlFor="type" className="block text-sm font-medium text-gray-700">
                     Type
                   </label>
-                  <input
-                    type="text"
+                  <select
                     id="type"
                     name="type"
                     value={foodEntry.type}
                     onChange={handleChange}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                    placeholder="e.g., Grocery shopping, Restaurant meal"
-                  />
+                    required
+                  >
+                    <option value="">Select a type</option>
+                    <option value="Grocery Store">Grocery Store</option>
+                    <option value="Restaurant/Take Out">Restaurant/Take Out</option>
+                  </select>
                 </div>
 
                 <div>
