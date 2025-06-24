@@ -19,6 +19,9 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <AuthProvider>{children}</AuthProvider>
+        <footer className="text-center py-4 text-gray-600 text-sm">
+          © 2025 Your Footprint. All rights reserved.
+        </footer>
       </body>
     </html>
   );

@@ -4,6 +4,7 @@ import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import { Pie } from 'react-chartjs-2';
 import { useAuth } from './context/AuthContext';
 import Link from 'next/link';
+import Image from 'next/image';
 import FootprintForm from './components/FootprintForm';
 import { supabase } from '../utils/supabase';
 
@@ -231,6 +232,15 @@ export default function Home() {
   if (!user) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-24">
+        <div className="mb-8">
+          <Image
+            src="/logo.png"
+            alt="Your Footprint Logo"
+            width={120}
+            height={120}
+            className="mx-auto"
+          />
+        </div>
         <h1 className="text-4xl font-bold mb-8">Welcome to Your Footprint</h1>
         <p className="text-lg mb-8">A calculator to estimate your household's greenhouse gas emissions</p>
         <p className="text-lg mb-8">Please sign in to view your carbon footprint data.</p>
