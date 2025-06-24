@@ -69,45 +69,38 @@ export default function Home() {
             return null; // No food data available
           }
 
-          // Group entries by week (Monday to Sunday)
-          const weeklyData: { [weekKey: string]: number[] } = {};
-          
-          foodEntries.forEach(entry => {
-            const date = new Date(entry.date);
-            const dayOfWeek = date.getDay();
-            const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Sunday = 6, Monday = 0
-            const mondayOfWeek = new Date(date);
-            mondayOfWeek.setDate(date.getDate() - daysFromMonday);
-            
-            const weekKey = mondayOfWeek.toISOString().split('T')[0];
-            
-            if (!weeklyData[weekKey]) {
-              weeklyData[weekKey] = [];
-            }
-            
-            if (entry.co2e && entry.co2e > 0) {
-              weeklyData[weekKey].push(entry.co2e);
-            }
-          });
+          // Calculate total CO2e from all entries
+          const totalCO2e = foodEntries
+            .filter(entry => entry.co2e && entry.co2e > 0)
+            .reduce((sum, entry) => sum + entry.co2e, 0);
 
-          // Calculate weekly averages
-          const weeklyAverages = Object.values(weeklyData)
-            .filter(weekEntries => weekEntries.length > 0)
-            .map(weekEntries => weekEntries.reduce((sum, co2e) => sum + co2e, 0));
-
-          if (weeklyAverages.length === 0) {
+          if (totalCO2e === 0) {
             return null;
           }
 
-          // Calculate overall weekly average
-          const averageWeeklyCO2e = weeklyAverages.reduce((sum, weeklyTotal) => sum + weeklyTotal, 0) / weeklyAverages.length;
+          // Calculate the time span in weeks
+          const dates = foodEntries.map(entry => new Date(entry.date));
+          const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
+          const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+          
+          // Calculate weeks between min and max date (inclusive)
+          const timeDiff = maxDate.getTime() - minDate.getTime();
+          const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+          const weeksDiff = Math.max(1, daysDiff / 7); // At least 1 week
+
+          // Calculate average weekly CO2e
+          const averageWeeklyCO2e = totalCO2e / weeksDiff;
 
           // Convert to monthly average (4.347 weeks per month)
           const monthlyFoodCO2e = averageWeeklyCO2e * 4.347;
 
           console.log('Food CO2e calculation:', {
-            totalWeeks: weeklyAverages.length,
-            weeklyAverages,
+            totalEntries: foodEntries.length,
+            totalCO2e,
+            minDate: minDate.toISOString().split('T')[0],
+            maxDate: maxDate.toISOString().split('T')[0],
+            daysDiff,
+            weeksDiff,
             averageWeeklyCO2e,
             monthlyFoodCO2e
           });
