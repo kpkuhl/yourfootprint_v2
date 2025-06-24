@@ -1053,7 +1053,7 @@ export default function FoodPage() {
                                 Packaging
                               </label>
                               <div className="space-y-1 max-h-24 overflow-y-auto">
-                                {['none', 'glass', 'plastic', 'steel', 'aluminum', 'paper', 'wood'].map((packagingType) => (
+                                {['none', 'glass', 'plastic', 'steel', 'aluminum', 'paper or cardboard'].map((packagingType) => (
                                   <label key={packagingType} className="flex items-center">
                                     <input
                                       type="checkbox"
@@ -1203,7 +1203,7 @@ export default function FoodPage() {
                           Packaging
                         </label>
                         <div className="space-y-2 mt-2">
-                          {['none', 'glass', 'plastic', 'steel', 'aluminum', 'paper', 'wood'].map((packagingType) => (
+                          {['none', 'glass', 'plastic', 'steel', 'aluminum', 'paper or cardboard'].map((packagingType) => (
                             <label key={packagingType} className="flex items-center">
                               <input
                                 type="checkbox"
