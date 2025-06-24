@@ -23,6 +23,7 @@ type FoodDetail = {
   packaging_type?: string[] | null;
   CI_custom: number | null;
   co2e_kg: number;
+  packaging_co2e_kg: number;
   food_entry_id: number;
   kg_food: number | null;
 };
@@ -42,6 +43,12 @@ type RestaurantMealEntry = {
   meal_id: number;
   meal_name: string;
   quantity: number;
+  co2e_kg: number;
+};
+
+type PackagingCI = {
+  id: number;
+  packaging: string;
   co2e_kg: number;
 };
 
@@ -79,6 +86,7 @@ export default function FoodPage() {
   const [defaultCIValues, setDefaultCIValues] = useState<DefaultCI[]>([]);
   const [restaurantMeals, setRestaurantMeals] = useState<RestaurantMeal[]>([]);
   const [restaurantMealEntries, setRestaurantMealEntries] = useState<RestaurantMealEntry[]>([]);
+  const [packagingCIValues, setPackagingCIValues] = useState<PackagingCI[]>([]);
 
   // Fetch household ID for the user
   useEffect(() => {
@@ -182,6 +190,25 @@ export default function FoodPage() {
     fetchRestaurantMeals();
   }, []);
 
+  // Fetch packaging CI values
+  useEffect(() => {
+    const fetchPackagingCI = async () => {
+      const { data, error } = await supabase
+        .from('packaging_CI')
+        .select('*')
+        .order('packaging');
+
+      if (error) {
+        console.error('Error fetching packaging CI values:', error);
+        return;
+      }
+
+      setPackagingCIValues(data || []);
+    };
+
+    fetchPackagingCI();
+  }, []);
+
   // Function to get carbon intensity for a food item
   const getCarbonIntensity = (category: string | null, customCI: number | null): number => {
     // If custom CI is provided, use it
@@ -210,6 +237,40 @@ export default function FoodPage() {
 
     const carbonIntensity = getCarbonIntensity(category, customCI);
     return kgFood * carbonIntensity;
+  };
+
+  // Function to calculate packaging CO2e
+  const calculatePackagingCO2e = (kgFood: number | null, packagingTypes: string[] | null): number => {
+    if (!kgFood || kgFood <= 0 || !packagingTypes || packagingTypes.length === 0) {
+      return 0;
+    }
+
+    // Filter out 'none' from packaging types
+    const validPackagingTypes = packagingTypes.filter(type => type !== 'none');
+    if (validPackagingTypes.length === 0) {
+      return 0;
+    }
+
+    // Calculate packaging weight as 7.37% of food weight
+    const packagingWeight = kgFood * 0.0737;
+    
+    // Split packaging weight equally between different types
+    const weightPerType = packagingWeight / validPackagingTypes.length;
+    
+    // Calculate total packaging CO2e
+    let totalPackagingCO2e = 0;
+    
+    validPackagingTypes.forEach(packagingType => {
+      const packagingCI = packagingCIValues.find(ci => 
+        ci.packaging.trim().toLowerCase() === packagingType.trim().toLowerCase()
+      );
+      
+      if (packagingCI) {
+        totalPackagingCO2e += weightPerType * packagingCI.co2e_kg;
+      }
+    });
+    
+    return totalPackagingCO2e;
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -383,7 +444,7 @@ export default function FoodPage() {
       }
 
       // Calculate total CO2e from both food details and restaurant meals
-      const foodDetailsCO2e = foodDetails.reduce((sum, detail) => sum + detail.co2e_kg, 0);
+      const foodDetailsCO2e = foodDetails.reduce((sum, detail) => sum + detail.co2e_kg + detail.packaging_co2e_kg, 0);
       const restaurantMealsCO2e = restaurantMealEntries.reduce((sum, meal) => sum + (meal.co2e_kg * meal.quantity), 0);
       const totalCO2e = foodDetailsCO2e + restaurantMealsCO2e;
 
@@ -504,7 +565,7 @@ export default function FoodPage() {
       }
 
       // Calculate total CO2e from both food details and restaurant meals
-      const foodDetailsCO2e = foodDetails.reduce((sum, detail) => sum + detail.co2e_kg, 0);
+      const foodDetailsCO2e = foodDetails.reduce((sum, detail) => sum + detail.co2e_kg + detail.packaging_co2e_kg, 0);
       const restaurantMealsCO2e = restaurantMealEntries.reduce((sum, meal) => sum + (meal.co2e_kg * meal.quantity), 0);
       const totalCO2e = foodDetailsCO2e + restaurantMealsCO2e;
 
@@ -561,6 +622,7 @@ export default function FoodPage() {
       packaging_type: null,
       CI_custom: null,
       co2e_kg: 0, // Will be calculated when kg_food is set
+      packaging_co2e_kg: 0, // Will be calculated when kg_food and packaging_type are set
       food_entry_id: 0,
       kg_food: null
     };
@@ -579,6 +641,15 @@ export default function FoodPage() {
           detail.kg_food, 
           detail.category, 
           detail.CI_custom
+        );
+      }
+      
+      // Recalculate packaging CO2e if kg_food or packaging_type changed
+      if (field === 'kg_food' || field === 'packaging_type') {
+        const detail = updated[index];
+        updated[index].packaging_co2e_kg = calculatePackagingCO2e(
+          detail.kg_food,
+          detail.packaging_type
         );
       }
       
@@ -751,6 +822,7 @@ export default function FoodPage() {
   }) => {
     const kgFood = extractedItem.quantity ? parseFloat(extractedItem.quantity) : null;
     const co2e_kg = calculateFoodCO2e(kgFood, extractedItem.category || null, extractedItem.CI_custom || null);
+    const packaging_co2e_kg = calculatePackagingCO2e(kgFood, Array.isArray(extractedItem.packaging) ? extractedItem.packaging : null);
 
     setFoodDetails(prev => [...prev, {
       household_id: householdId || '',
@@ -763,6 +835,7 @@ export default function FoodPage() {
       packaging_type: Array.isArray(extractedItem.packaging) ? extractedItem.packaging : null,
       CI_custom: extractedItem.CI_custom || null,
       co2e_kg,
+      packaging_co2e_kg,
       food_entry_id: 0,
       kg_food: kgFood
     }]);
@@ -775,6 +848,7 @@ export default function FoodPage() {
     const newFoodDetails = extractedItems.map(item => {
       const kgFood = item.quantity ? parseFloat(item.quantity) : null;
       const co2e_kg = calculateFoodCO2e(kgFood, item.category || null, item.CI_custom || null);
+      const packaging_co2e_kg = calculatePackagingCO2e(kgFood, Array.isArray(item.packaging) ? item.packaging : null);
 
       return {
         household_id: householdId || '',
@@ -787,6 +861,7 @@ export default function FoodPage() {
         packaging_type: Array.isArray(item.packaging) ? item.packaging : null,
         CI_custom: item.CI_custom || null,
         co2e_kg,
+        packaging_co2e_kg,
         food_entry_id: 0,
         kg_food: kgFood
       };
@@ -1278,6 +1353,22 @@ export default function FoodPage() {
                           Based on quantity × carbon intensity
                         </p>
                       </div>
+
+                      {detail.packaging_co2e_kg > 0 && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">
+                            Packaging CO2e (kg)
+                          </label>
+                          <div className="mt-1 p-2 bg-orange-50 border border-orange-300 rounded-md">
+                            <span className="text-lg font-semibold text-orange-600">
+                              {detail.packaging_co2e_kg.toFixed(3)} kg CO2e
+                            </span>
+                          </div>
+                          <p className="mt-1 text-sm text-gray-500">
+                            Based on 7.37% of food weight × packaging carbon intensity
+                          </p>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1372,13 +1463,14 @@ export default function FoodPage() {
                   <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
                     <h3 className="text-lg font-semibold text-blue-800 mb-2">Total Carbon Footprint</h3>
                     <div className="text-2xl font-bold text-blue-600">
-                      {(foodDetails.reduce((sum, detail) => sum + detail.co2e_kg, 0) + 
+                      {(foodDetails.reduce((sum, detail) => sum + detail.co2e_kg + detail.packaging_co2e_kg, 0) + 
                         restaurantMealEntries.reduce((sum, meal) => sum + (meal.co2e_kg * meal.quantity), 0)).toFixed(3)} kg CO2e
                     </div>
                     <p className="text-sm text-blue-600 mt-1">
                       Combined carbon footprint of {foodDetails.length} food item{foodDetails.length !== 1 ? 's' : ''}
                       {foodDetails.length > 0 && restaurantMealEntries.length > 0 ? ' and ' : ''}
                       {restaurantMealEntries.length > 0 ? `${restaurantMealEntries.length} restaurant meal${restaurantMealEntries.length !== 1 ? 's' : ''}` : ''}
+                      {foodDetails.some(detail => detail.packaging_co2e_kg > 0) && ' (including packaging)'}
                     </p>
                   </div>
                 )}
