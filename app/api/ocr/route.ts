@@ -5,51 +5,34 @@ import { ImageAnnotatorClient } from '@google-cloud/vision';
 let client: ImageAnnotatorClient;
 
 try {
-  console.log('Initializing Google Cloud Vision client...');
-  console.log('Available environment variables:', {
-    hasKeyFile: !!process.env.GOOGLE_CLOUD_KEY_FILE,
-    hasCredentials: !!process.env.GOOGLE_CLOUD_CREDENTIALS,
-    keyFilePath: process.env.GOOGLE_CLOUD_KEY_FILE,
-  });
-
   // Try to use direct credentials first (better for Vercel)
   if (process.env.GOOGLE_CLOUD_CREDENTIALS) {
-    console.log('Using direct credentials from environment variable');
     try {
       const credentials = JSON.parse(process.env.GOOGLE_CLOUD_CREDENTIALS);
       client = new ImageAnnotatorClient({
         credentials: credentials,
       });
     } catch (parseError) {
-      console.error('Failed to parse GOOGLE_CLOUD_CREDENTIALS:', parseError);
       throw new Error('Invalid GOOGLE_CLOUD_CREDENTIALS format');
     }
   } 
   // Fall back to service account key file
   else if (process.env.GOOGLE_CLOUD_KEY_FILE) {
-    console.log('Using service account key file:', process.env.GOOGLE_CLOUD_KEY_FILE);
     client = new ImageAnnotatorClient({
       keyFilename: process.env.GOOGLE_CLOUD_KEY_FILE,
     });
   } 
   // Fall back to default credentials (if running on Google Cloud)
   else {
-    console.log('Using default credentials');
     client = new ImageAnnotatorClient();
   }
-  console.log('Google Cloud Vision client initialized successfully');
 } catch (error) {
-  console.error('Failed to initialize Google Cloud Vision client:', error);
-  console.error('Error details:', error instanceof Error ? error.message : 'Unknown error');
   client = null as any;
 }
 
 export async function POST(request: NextRequest) {
-  console.log('OCR API route called');
-  
   try {
     if (!client) {
-      console.error('Google Cloud Vision client not initialized');
       return NextResponse.json(
         { error: 'Google Cloud Vision not configured. Please set up credentials.' },
         { status: 500 }
@@ -57,14 +40,8 @@ export async function POST(request: NextRequest) {
     }
 
     const { imageUrl, imageData, imageType } = await request.json();
-    console.log('Request received with:', { 
-      hasImageData: !!imageData, 
-      hasImageUrl: !!imageUrl, 
-      imageType 
-    });
 
     if (!imageData && !imageUrl) {
-      console.error('No image data or URL provided');
       return NextResponse.json({ error: 'Image data or URL is required' }, { status: 400 });
     }
 
@@ -72,37 +49,27 @@ export async function POST(request: NextRequest) {
 
     if (imageData) {
       // Handle base64 image data
-      console.log('Processing OCR for base64 image data...');
-      console.log('Image type:', imageType);
-      console.log('Base64 data length:', imageData.length);
-      
       imageSource = {
         image: {
           content: imageData
         }
       };
-    } else if (imageUrl) {
+    } else {
       // Handle image URL (fallback)
-      console.log('Processing OCR for image URL:', imageUrl);
 
       // Validate the image URL
       if (!imageUrl.startsWith('http') && !imageUrl.startsWith('blob:')) {
-        console.error('Invalid image URL format:', imageUrl);
         return NextResponse.json({ error: 'Invalid image URL format' }, { status: 400 });
       }
 
       // Check if the image is accessible (for non-blob URLs)
       if (imageUrl.startsWith('http')) {
         try {
-          console.log('Checking if image is accessible...');
           const imageResponse = await fetch(imageUrl, { method: 'HEAD' });
-          console.log('Image accessibility check status:', imageResponse.status);
           if (!imageResponse.ok) {
-            console.error('Image not accessible:', imageResponse.status, imageResponse.statusText);
             return NextResponse.json({ error: 'Image not accessible' }, { status: 400 });
           }
         } catch (error) {
-          console.error('Error checking image accessibility:', error);
           return NextResponse.json({ error: 'Cannot access image' }, { status: 400 });
         }
       }
@@ -117,17 +84,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Perform OCR on the image
-    console.log('Calling Google Cloud Vision API...');
-    console.log('Image source structure:', JSON.stringify(imageSource, null, 2));
     const [result] = await client.textDetection(imageSource);
-    console.log('Google Cloud Vision API response received');
     
     const detections = result.textAnnotations || [];
-    console.log('Number of text detections:', detections.length);
-    console.log('Raw detection result:', JSON.stringify(result, null, 2));
 
     if (detections.length === 0) {
-      console.log('No text detected in the image');
       return NextResponse.json({ 
         error: 'No text detected in the image',
         extractedItems: []
@@ -136,21 +97,9 @@ export async function POST(request: NextRequest) {
 
     // Get the full text
     const fullText = detections[0].description || '';
-    console.log('Extracted text length:', fullText.length);
-    console.log('First 200 characters of extracted text:', fullText.substring(0, 200));
-    console.log('Full extracted text:', fullText);
 
     // Parse the text to extract food items
     const extractedItems = parseReceiptText(fullText);
-    console.log('Parsed items count:', extractedItems.length);
-    console.log('Parsed items:', extractedItems);
-
-    if (extractedItems.length === 0 && fullText.length > 0) {
-      console.log('Text was extracted but no items were parsed. This might indicate:');
-      console.log('1. The parsing logic is too strict');
-      console.log('2. The receipt format is different than expected');
-      console.log('3. The text needs preprocessing');
-    }
 
     return NextResponse.json({
       success: true,
@@ -159,10 +108,6 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('OCR processing error details:', error);
-    console.error('Error message:', error instanceof Error ? error.message : 'Unknown error');
-    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-    
     return NextResponse.json(
       { 
         error: 'Failed to process image. Please check your Google Cloud Vision setup.',
@@ -186,9 +131,6 @@ function parseReceiptText(text: string): Array<{
     quantity?: string;
     category?: string;
   }> = [];
-
-  console.log('Processing lines:', lines.length);
-  console.log('Sample lines:', lines.slice(0, 5));
 
   // Common food keywords to identify items
   const foodKeywords = [
@@ -217,9 +159,6 @@ function parseReceiptText(text: string): Array<{
   for (const line of lines) {
     const trimmedLine = line.trim();
     
-    console.log(`Processing line: "${trimmedLine}"`);
-    console.log(`Line length: ${trimmedLine.length}, contains price pattern: ${/(\$?\d+\.\d{2})/.test(trimmedLine)}`);
-    
     // Skip header/footer lines
     if (trimmedLine.toLowerCase().includes('total') || 
         trimmedLine.toLowerCase().includes('subtotal') ||
@@ -230,53 +169,39 @@ function parseReceiptText(text: string): Array<{
         trimmedLine.toLowerCase().includes('store') ||
         trimmedLine.toLowerCase().includes('date') ||
         trimmedLine.toLowerCase().includes('time')) {
-      console.log(`Skipping header/footer line: "${trimmedLine}"`);
       continue;
     }
 
     // Skip very short lines
     if (trimmedLine.length < 3) {
-      console.log(`Skipping short line: "${trimmedLine}"`);
       continue;
     }
 
     // Extract price - prioritize prices at the end of the line
     let price: string | undefined;
     
-    console.log(`Looking for prices in line: "${trimmedLine}"`);
-    
     // First, try to find price at the end of the line (most common in receipts)
     // Handle both formats: $1.23 and $ 1.23 (with space after dollar sign)
     const endPriceMatch = trimmedLine.match(/(\$?\s*\d+\.\d{2})\s*$/);
     if (endPriceMatch) {
       price = endPriceMatch[1];
-      console.log(`Found end price: "${price}" in line: "${trimmedLine}"`);
     } else {
-      console.log(`No end price found, checking for separated prices...`);
-      
       // Look for prices that are clearly separated from item names
       // This pattern looks for prices that come after some text and are separated by spaces
       // Handle both formats: $1.23 and $ 1.23
       const separatedPriceMatch = trimmedLine.match(/([A-Za-z\s]+)\s+(\$?\s*\d+\.\d{2})/);
       if (separatedPriceMatch) {
         price = separatedPriceMatch[2];
-        console.log(`Found separated price: "${price}" in line: "${trimmedLine}"`);
       } else {
-        console.log(`No separated price found, checking for any price patterns...`);
-        
         // More flexible approach: find any price pattern in the line
         // but prioritize prices that appear after some text
         // Handle both formats: $1.23 and $ 1.23
         const allPriceMatches = trimmedLine.match(/(\$?\s*\d+\.\d{2})/g);
-        console.log(`All price matches found:`, allPriceMatches);
         
         if (allPriceMatches && allPriceMatches.length > 0) {
           // If there are multiple prices, take the last one (most likely to be the actual price)
           price = allPriceMatches[allPriceMatches.length - 1];
-          console.log(`Found price from multiple matches: "${price}" in line: "${trimmedLine}"`);
         } else {
-          console.log(`No price patterns found in line: "${trimmedLine}"`);
-          
           // Fall back to finding any price in the line, but be more careful
           // Look for prices that are at least 3 characters from the start (to avoid item codes)
           // Handle both formats: $1.23 and $ 1.23
@@ -286,12 +211,7 @@ function parseReceiptText(text: string): Array<{
             // Only use this price if it's not at the very beginning (likely an item code)
             if (priceIndex > 3) {
               price = priceMatch[0];
-              console.log(`Found price with fallback: "${price}" in line: "${trimmedLine}"`);
-            } else {
-              console.log(`Price found but too close to start (likely item code): "${priceMatch[0]}"`);
             }
-          } else {
-            console.log(`No price match found at all in line: "${trimmedLine}"`);
           }
         }
       }
@@ -302,7 +222,6 @@ function parseReceiptText(text: string): Array<{
       // Remove any existing dollar sign and spaces, then add it back
       const numericPrice = price.replace(/^\$\s*/, '').replace(/\s+/g, '');
       price = `$${numericPrice}`;
-      console.log(`Formatted price: "${price}"`);
     }
 
     // Extract quantity using multiple patterns
@@ -349,13 +268,11 @@ function parseReceiptText(text: string): Array<{
       
       if (!isFoodItem) {
         itemName = firstWordMatch[1];
-        console.log(`Extracted first word as item name: "${itemName}" from "${trimmedLine}"`);
       }
     }
 
     // Skip lines that are mostly numbers or codes
     if (itemName.length < 3 || /^\d+$/.test(itemName)) {
-      console.log(`Skipping line that's mostly numbers: "${trimmedLine}" -> "${itemName}"`);
       continue;
     }
 
@@ -363,8 +280,6 @@ function parseReceiptText(text: string): Array<{
     if (itemName.length > 2 && itemName.length < 100) {
       // Try to categorize the item
       const category = categorizeFoodItem(itemName);
-      
-      console.log(`Parsed line: "${trimmedLine}" -> item: "${itemName}", price: "${price}", quantity: "${quantity}", category: "${category}"`);
       
       items.push({
         item: itemName,

@@ -96,17 +96,6 @@ export default function Home() {
           // Convert to monthly average (4.347 weeks per month)
           const monthlyFoodCO2e = averageWeeklyCO2e * 4.347;
 
-          console.log('Food CO2e calculation:', {
-            totalEntries: foodEntries.length,
-            totalCO2e,
-            minDate: minDate.toISOString().split('T')[0],
-            maxDate: maxDate.toISOString().split('T')[0],
-            daysDiff,
-            weeksDiff,
-            averageWeeklyCO2e,
-            monthlyFoodCO2e
-          });
-
           return monthlyFoodCO2e;
         };
 
@@ -267,7 +256,7 @@ export default function Home() {
     <main className="flex min-h-screen flex-col items-center p-24">
       <div className="w-full max-w-6xl flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-4xl font-bold">Your Carbon Footprint</h1>
+          <h1 className="text-4xl font-bold">Your Household Carbon Footprint</h1>
           <p className="text-lg text-gray-600 mt-2">
             Estimated Monthly kg CO2e: {footprintData ? 
               (footprintData.electricity + footprintData.natural_gas + footprintData.water + 

@@ -287,7 +287,6 @@ export default function NaturalGasPage() {
       if (fetchError) throw fetchError;
 
       if (!recentData || recentData.length === 0) {
-        console.log('No natural gas data found for the last 12 months');
         return;
       }
 
@@ -307,9 +306,12 @@ export default function NaturalGasPage() {
       const monthlyAverages = Object.values(monthlyTotals).map(
         ({ sum, count }) => sum / count
       );
-      const overallAverage = monthlyAverages.reduce((a, b) => a + b, 0) / monthlyAverages.length;
+      
+      const overallAverage = monthlyAverages.length > 0 
+        ? monthlyAverages.reduce((sum, avg) => sum + avg, 0) / monthlyAverages.length 
+        : 0;
 
-      // Try to update the record first
+      // Update the household data
       const { error: updateError } = await supabase
         .from('households_data')
         .update({ 
@@ -318,27 +320,10 @@ export default function NaturalGasPage() {
         })
         .eq('household_id', householdId);
 
-      // If update fails because record doesn't exist, create it
-      if (updateError && updateError.code === 'PGRST116') {
-        const { error: insertError } = await supabase
-          .from('households_data')
-          .insert([{
-            household_id: householdId,
-            natural_gas: overallAverage,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }]);
-
-        if (insertError) {
-          console.error('Error creating households_data record:', insertError);
-          throw insertError;
-        }
-      } else if (updateError) {
-        console.error('Error updating households_data record:', updateError);
+      if (updateError) {
+        console.error('Error updating household natural gas average:', updateError);
         throw updateError;
       }
-
-      console.log('Successfully updated household natural gas average:', overallAverage);
     } catch (error) {
       console.error('Error updating household natural gas:', error);
       setError('Failed to update household natural gas average');

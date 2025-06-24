@@ -247,54 +247,37 @@ export default function AirTravelPage() {
     e.preventDefault();
     if (!user || !householdId) return;
 
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
-
     try {
-      const co2e_kg = calculateCO2e(airTravelData.distance, airTravelData.num_travelers, airTravelData.co2e_kg_traveler, airTravelData.co2e_kg_per_trip, airTravelData.direct_co2e_input);
-      
-      // Prepare data for submission
+      setLoading(true);
+      setError(null);
+
       const dataToSubmit = {
-        household_id: householdId,
-        leave_date: airTravelData.leave_date,
-        return_date: airTravelData.return_date,
-        roundtrip: airTravelData.roundtrip,
-        num_travelers: airTravelData.num_travelers,
-        from: airTravelData.from,
-        to: airTravelData.to,
-        distance: airTravelData.distance,
-        co2e_kg_traveler: airTravelData.co2e_kg_traveler,
-        co2e_kg: co2e_kg
+        ...airTravelData,
+        household_id: householdId
       };
 
-      console.log('Submitting air travel data:', dataToSubmit);
+      const { error } = await supabase
+        .from('air_travel')
+        .insert([dataToSubmit]);
 
-      if (isNewEntry) {
-        const { error } = await supabase
-          .from('air_travel')
-          .insert([dataToSubmit]);
+      if (error) throw error;
 
-        if (error) {
-          console.error('Error inserting air travel data:', error);
-          throw error;
-        }
-      } else {
-        const { error } = await supabase
-          .from('air_travel')
-          .update(dataToSubmit)
-          .eq('id', airTravelData.id);
-
-        if (error) {
-          console.error('Error updating air travel data:', error);
-          throw error;
-        }
-      }
-
+      // Update household air travel average after successful submission
       await updateHouseholdAirTravel();
 
+      // Refresh data after submission
+      const { data: newData, error: fetchError } = await supabase
+        .from('air_travel')
+        .select('*')
+        .eq('household_id', householdId)
+        .order('leave_date', { ascending: false });
+
+      if (fetchError) throw fetchError;
+
+      setRawData(newData || []);
       setSuccess('Air travel data saved successfully!');
-      setIsNewEntry(true);
+      
+      // Reset form
       setAirTravelData({
         household_id: householdId,
         leave_date: new Date().toISOString().split('T')[0],
@@ -311,7 +294,7 @@ export default function AirTravelPage() {
       });
     } catch (error) {
       console.error('Error saving air travel data:', error);
-      setError(error instanceof Error ? error.message : 'Failed to save air travel data. Please try again.');
+      setError('Failed to save air travel data');
     } finally {
       setLoading(false);
     }
@@ -455,29 +438,13 @@ export default function AirTravelPage() {
     if (!user || !householdId || !editingId || !editForm) return;
 
     try {
-      const co2e_kg = calculateCO2e(
-        editForm.distance,
-        editForm.num_travelers,
-        editForm.co2e_kg_traveler,
-        editForm.co2e_kg_per_trip,
-        editForm.direct_co2e_input
-      );
+      setLoading(true);
+      setError(null);
 
-      // Prepare data for submission
       const dataToSubmit = {
-        household_id: householdId,
-        leave_date: editForm.leave_date,
-        return_date: editForm.return_date,
-        roundtrip: editForm.roundtrip,
-        num_travelers: editForm.num_travelers,
-        from: editForm.from,
-        to: editForm.to,
-        distance: editForm.distance,
-        co2e_kg_traveler: editForm.co2e_kg_traveler,
-        co2e_kg: co2e_kg
+        ...editForm,
+        household_id: householdId
       };
-
-      console.log('Updating air travel data:', dataToSubmit);
 
       const { error } = await supabase
         .from('air_travel')
@@ -485,35 +452,29 @@ export default function AirTravelPage() {
         .eq('id', editingId)
         .eq('household_id', householdId);
 
-      if (error) {
-        console.error('Error updating air travel entry:', error);
-        throw error;
-      }
+      if (error) throw error;
 
-      setRawData(prev =>
-        prev.map(entry =>
-          entry.id === editingId ? { ...editForm, co2e_kg } : entry
-        )
-      );
-
-      setMonthlyData(prev =>
-        prev.map(entry =>
-          entry.id === editingId
-            ? {
-                ...entry,
-                CO2e: co2e_kg
-              }
-            : entry
-        )
-      );
-
+      // Update household air travel average after successful update
       await updateHouseholdAirTravel();
 
+      // Refresh data after update
+      const { data: newData, error: fetchError } = await supabase
+        .from('air_travel')
+        .select('*')
+        .eq('household_id', householdId)
+        .order('leave_date', { ascending: false });
+
+      if (fetchError) throw fetchError;
+
+      setRawData(newData || []);
       setEditingId(null);
       setEditForm(null);
+      setSuccess('Air travel data updated successfully!');
     } catch (error) {
-      console.error('Error updating air travel entry:', error);
-      setError('Failed to update entry. Please try again.');
+      console.error('Error updating air travel data:', error);
+      setError('Failed to update air travel data');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -522,104 +483,17 @@ export default function AirTravelPage() {
     if (!user || !householdId) return;
 
     try {
-      // First get all air travel data to find the date range
-      const { data: allData, error: allDataError } = await supabase
-        .from('air_travel')
-        .select('*')
-        .eq('household_id', householdId)
-        .order('leave_date', { ascending: true });
+      // Get the last 12 months of data
+      const twelveMonthsAgo = new Date();
+      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+      const cutoffDate = twelveMonthsAgo.toISOString().split('T')[0];
 
-      if (allDataError) {
-        console.error('Error fetching all air travel data:', allDataError);
-        throw allDataError;
-      }
-
-      if (!allData || allData.length === 0) {
-        console.log('No air travel data found');
-        // Try to update the record first
-        const { error: updateError } = await supabase
-          .from('households_data')
-          .update({ 
-            air_travel: 0,
-            updated_at: new Date().toISOString()
-          })
-          .eq('household_id', householdId);
-
-        // If update fails because record doesn't exist, create it
-        if (updateError && updateError.code === 'PGRST116') {
-          const { error: insertError } = await supabase
-            .from('households_data')
-            .insert([{
-              household_id: householdId,
-              air_travel: 0,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            }]);
-
-          if (insertError) {
-            console.error('Error creating households_data record:', insertError);
-            throw insertError;
-          }
-        } else if (updateError) {
-          console.error('Error updating households_data record:', updateError);
-          throw updateError;
-        }
-        
-        // Reset calculation values
-        setMonthlyTotals({});
-        setTotalEmissions(0);
-        setNumberOfMonths(0);
-        setOverallAverage(0);
-        return;
-      }
-
-      console.log('All air travel data:', allData);
-
-      // Get the current date and calculate the maximum allowed future date (12 months from now)
-      const currentDate = new Date();
-      currentDate.setHours(0, 0, 0, 0); // Set to start of day
-      const maxFutureDate = new Date(currentDate);
-      maxFutureDate.setMonth(maxFutureDate.getMonth() + 12);
-
-      // Find the farthest future date in the data, but not beyond maxFutureDate
-      const futureDates = allData
-        .map(entry => {
-          const date = new Date(entry.leave_date);
-          date.setHours(0, 0, 0, 0);
-          return date;
-        })
-        .filter(date => date > currentDate && date <= maxFutureDate);
-
-      console.log('Current date:', currentDate);
-      console.log('Max future date:', maxFutureDate);
-      console.log('Future dates found:', futureDates);
-
-      // If we have future dates, use the farthest one; otherwise use current date
-      const endDate = futureDates.length > 0 
-        ? new Date(Math.max(...futureDates.map(d => d.getTime())))
-        : currentDate;
-
-      // Set end date to the last day of its month
-      endDate.setMonth(endDate.getMonth() + 1);
-      endDate.setDate(0);
-      endDate.setHours(23, 59, 59, 999);
-
-      // Calculate the start date (12 months before the end date)
-      const startDate = new Date(endDate);
-      startDate.setMonth(startDate.getMonth() - 11); // Go back 11 months to get 12 months total
-      startDate.setDate(1); // Set to first day of month
-      startDate.setHours(0, 0, 0, 0);
-
-      console.log('End date for calculation:', endDate);
-      console.log('Start date for calculation:', startDate);
-
-      // Get data for the calculated date range
+      // Fetch air travel data for the last 12 months
       const { data: recentData, error: fetchError } = await supabase
         .from('air_travel')
         .select('*')
         .eq('household_id', householdId)
-        .gte('leave_date', startDate.toISOString().split('T')[0])
-        .lte('leave_date', endDate.toISOString().split('T')[0])
+        .gte('leave_date', cutoffDate)
         .order('leave_date', { ascending: true });
 
       if (fetchError) {
@@ -627,11 +501,13 @@ export default function AirTravelPage() {
         throw fetchError;
       }
 
-      console.log('Recent data found:', recentData);
+      if (!recentData || recentData.length === 0) {
+        return;
+      }
 
       // Create a map of all months in the range, initialized with zero emissions
       const monthlyTotalsMap: { [key: string]: { sum: number; count: number } } = {};
-      const currentDateInRange = new Date(startDate);
+      const currentDateInRange = new Date(twelveMonthsAgo);
       
       // Count exactly 12 months
       for (let i = 0; i < 12; i++) {
@@ -639,8 +515,6 @@ export default function AirTravelPage() {
         monthlyTotalsMap[monthKey] = { sum: 0, count: 0 };
         currentDateInRange.setMonth(currentDateInRange.getMonth() + 1);
       }
-
-      console.log('Initial monthly totals:', monthlyTotalsMap);
 
       // Sum up emissions for each month that has travel
       recentData.forEach(entry => {
@@ -650,11 +524,8 @@ export default function AirTravelPage() {
         if (monthlyTotalsMap[month]) {
           monthlyTotalsMap[month].sum += entry.co2e_kg;
           monthlyTotalsMap[month].count += 1;
-          console.log(`Adding ${entry.co2e_kg} to ${month}, new total: ${monthlyTotalsMap[month].sum}`);
         }
       });
-
-      console.log('Final monthly totals:', monthlyTotalsMap);
 
       // Calculate total emissions and number of months
       const totalEmissionsValue = Object.values(monthlyTotalsMap).reduce((sum, { sum: monthSum }) => sum + monthSum, 0);
@@ -663,25 +534,7 @@ export default function AirTravelPage() {
       // Calculate average monthly emissions
       const overallAverageValue = totalEmissionsValue / numberOfMonthsValue;
 
-      console.log('Total emissions:', totalEmissionsValue);
-      console.log('Number of months:', numberOfMonthsValue);
-      console.log('Calculated overall average:', overallAverageValue);
-
-      // Update state with calculation values
-      setMonthlyTotals(monthlyTotalsMap);
-      setTotalEmissions(totalEmissionsValue);
-      setNumberOfMonths(numberOfMonthsValue);
-      setOverallAverage(overallAverageValue);
-
-      // Update monthlyData for the chart
-      const monthlyValues = Object.entries(monthlyTotalsMap).map(([month, data]) => ({
-        id: month,
-        month,
-        CO2e: data.sum
-      }));
-      setMonthlyData(monthlyValues);
-
-      // Try to update the record first
+      // Update the household data
       const { error: updateError } = await supabase
         .from('households_data')
         .update({ 
@@ -690,30 +543,12 @@ export default function AirTravelPage() {
         })
         .eq('household_id', householdId);
 
-      // If update fails because record doesn't exist, create it
-      if (updateError && updateError.code === 'PGRST116') {
-        const { error: insertError } = await supabase
-          .from('households_data')
-          .insert([{
-            household_id: householdId,
-            air_travel: overallAverageValue,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }]);
-
-        if (insertError) {
-          console.error('Error creating households_data record:', insertError);
-          throw insertError;
-        }
-      } else if (updateError) {
-        console.error('Error updating households_data record:', updateError);
+      if (updateError) {
+        console.error('Error updating household air travel value:', updateError);
         throw updateError;
       }
-
-      console.log('Successfully updated household air travel value:', overallAverageValue);
     } catch (error) {
-      console.error('Error in updateHouseholdAirTravel:', error);
-      setError('Failed to update household air travel average');
+      console.error('Error updating household air travel:', error);
     }
   };
 

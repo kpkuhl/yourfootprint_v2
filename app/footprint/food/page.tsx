@@ -727,53 +727,66 @@ export default function FoodPage() {
   };
 
   const processReceiptOCR = async (file: File) => {
-    setProcessingOCR(true);
-    setError(null);
-    
+    if (!file) return;
+
     try {
-      console.log('Converting file to base64 for OCR processing...');
-      console.log('File size before processing:', file.size, 'bytes');
-      
-      // Check file size (Google Cloud Vision has a 10MB limit)
-      const maxSize = 10 * 1024 * 1024; // 10MB
-      if (file.size > maxSize) {
-        setError('Image file is too large. Please use an image smaller than 10MB.');
-        setProcessingOCR(false);
-        return;
-      }
-      
-      // Compress image if it's larger than 1MB
-      let processedFile = file;
-      if (file.size > 1024 * 1024) { // 1MB
-        console.log('Compressing image to reduce size...');
-        processedFile = await compressImage(file);
-        console.log('Compressed file size:', processedFile.size, 'bytes');
-      }
-      
+      setProcessingOCR(true);
+      setError(null);
+
       // Convert file to base64
+      const base64Data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          const base64 = result.split(',')[1];
+          resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      // Compress image if it's too large
+      let processedFile = file;
+      if (file.size > 1024 * 1024) { // 1MB limit
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+        
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+          img.src = URL.createObjectURL(file);
+        });
+
+        const maxSize = 1024;
+        const ratio = Math.min(maxSize / img.width, maxSize / img.height);
+        canvas.width = img.width * ratio;
+        canvas.height = img.height * ratio;
+        
+        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+        
+        canvas.toBlob((blob) => {
+          if (blob) {
+            processedFile = new File([blob], file.name, { type: file.type });
+          }
+        }, file.type, 0.8);
+      }
+
+      // Convert processed file to base64
       const base64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => {
           const result = reader.result as string;
-          // Remove the data:image/...;base64, prefix
-          const base64Data = result.split(',')[1];
-          console.log('File converted to base64, length:', base64Data.length);
-          console.log('File type:', processedFile.type);
-          console.log('File size:', processedFile.size);
-          resolve(base64Data);
+          const base64 = result.split(',')[1];
+          resolve(base64);
         };
-        reader.onerror = (error) => {
-          console.error('Error reading file:', error);
-          reject(error);
-        };
+        reader.onerror = reject;
         reader.readAsDataURL(processedFile);
       });
 
-      console.log('Sending OCR request with base64 image data...');
-      
-      // Create a timeout promise
+      // Set up timeout for the fetch request
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('OCR request timed out after 30 seconds')), 30000);
+        setTimeout(() => reject(new Error('OCR request timed out')), 30000);
       });
       
       // Create the fetch promise
@@ -790,18 +803,12 @@ export default function FoodPage() {
 
       // Race between fetch and timeout
       const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
-
-      console.log('OCR API response status:', response.status);
       
       const data = await response.json();
-      console.log('OCR API response data:', data);
 
       if (data.success) {
         setExtractedItems(data.extractedItems);
-        console.log('Extracted items:', data.extractedItems);
       } else {
-        console.error('OCR processing failed:', data.error);
-        console.error('Error details:', data.details);
         setError(`OCR processing failed: ${data.error}${data.details ? ` - ${data.details}` : ''}`);
       }
     } catch (error) {

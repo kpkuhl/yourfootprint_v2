@@ -24,69 +24,76 @@ export default function HouseholdDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [householdId, setHouseholdId] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchHouseholdId = async () => {
       if (!user) return;
 
       try {
-        console.log('Fetching household ID for user:', user.id);
-        // First get the household ID
-        const { data: householdData, error: householdError } = await supabase
+        const { data: householdData, error } = await supabase
           .from('households')
           .select('id')
           .eq('user_id', user.id)
           .single();
 
-        if (householdError) {
-          console.error('Error fetching household ID:', householdError);
-          throw householdError;
-        }
-        if (!householdData) {
-          console.error('No household found for user:', user.id);
-          throw new Error('No household found');
+        if (error) {
+          console.error('Error fetching household ID:', error);
+          return;
         }
 
-        console.log('Found household ID:', householdData.id);
-
-        // Then get the details from households_data
-        const { data, error } = await supabase
-          .from('households_data')
-          .select('name, num_members, sq_ft, num_vehicles, zipcode')
-          .eq('household_id', householdData.id)
-          .single();
-
-        console.log('Households data response:', { data, error });
-
-        // If there's an error other than "no rows returned", throw it
-        if (error && error.code !== 'PGRST116') {
-          console.error('Error fetching households_data:', error);
-          throw error;
-        }
-        
-        // If we have data, use it. Otherwise, keep the default values
-        if (data) {
-          console.log('Setting details from data:', data);
-          setDetails({
-            name: data.name || '',
-            num_members: data.num_members || 1,
-            sq_ft: data.sq_ft || 0,
-            num_vehicles: data.num_vehicles || 0,
-            zipcode: data.zipcode || ''
-          });
-        } else {
-          console.log('No data found in households_data, using default values');
+        if (householdData) {
+          setHouseholdId(householdData.id);
         }
       } catch (error) {
-        console.error('Error in fetchData:', error);
-        setError('Failed to load household details');
-      } finally {
-        setLoading(false);
+        console.error('Error in fetchHouseholdId:', error);
       }
     };
 
-    fetchData();
+    fetchHouseholdId();
   }, [user]);
+
+  useEffect(() => {
+    const fetchDetails = async () => {
+      if (!user || !householdId) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('households_data')
+          .select('*')
+          .eq('household_id', householdId)
+          .single();
+
+        if (error && error.code !== 'PGRST116') {
+          console.error('Error fetching household details:', error);
+          return;
+        }
+
+        if (data) {
+          setDetails({
+            name: data.name || '',
+            num_members: data.num_members || 1,
+            num_vehicles: data.num_vehicles || 0,
+            zipcode: data.zipcode || '',
+            sq_ft: data.sq_ft || 0
+          });
+        } else {
+          // Set default values if no data exists
+          setDetails({
+            name: '',
+            num_members: 1,
+            num_vehicles: 0,
+            zipcode: '',
+            sq_ft: 0
+          });
+        }
+      } catch (error) {
+        console.error('Error in fetchDetails:', error);
+      }
+    };
+
+    fetchDetails();
+  }, [user, householdId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

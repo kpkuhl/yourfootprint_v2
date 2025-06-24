@@ -108,14 +108,11 @@ export default function ElectricityPage() {
 
   // Load saved form data from localStorage
   useEffect(() => {
-    console.log('Component mounted - checking localStorage');
     if (typeof window !== 'undefined') {
       const savedData = localStorage.getItem(STORAGE_KEY);
-      console.log('Retrieved from localStorage:', savedData);
       if (savedData) {
         try {
           const parsedData = JSON.parse(savedData);
-          console.log('Parsed data:', parsedData);
           setElectricityData(parsedData);
           setInputAmount(parsedData.amount_kWh);
           setInputUnit('kWh');
@@ -147,9 +144,7 @@ export default function ElectricityPage() {
 
   // Save form data to localStorage whenever it changes
   useEffect(() => {
-    console.log('electricityData changed:', electricityData);
     if (typeof window !== 'undefined' && electricityData.household_id) {
-      console.log('Saving to localStorage:', electricityData);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(electricityData));
     }
   }, [electricityData]);
@@ -183,14 +178,11 @@ export default function ElectricityPage() {
     const fetchData = async () => {
       if (!user || !householdId) return;
       
-      // Check localStorage first
       const savedData = localStorage.getItem(STORAGE_KEY);
       if (savedData) {
-        console.log('Found data in localStorage, skipping Supabase fetch');
         return;
       }
       
-      console.log('No localStorage data found, fetching from Supabase for household:', householdId);
       const { data, error } = await supabase
         .from('electricity')
         .select('*')
@@ -203,15 +195,12 @@ export default function ElectricityPage() {
         console.error('Error fetching data:', error);
         return;
       }
-
-      console.log('Retrieved data from Supabase:', data);
       
       if (data) {
         setElectricityData(data);
         setInputAmount(data.amount_kWh);
         setInputUnit('kWh');
       } else {
-        // Set default values for new entries
         const today = new Date();
         const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
         setElectricityData({
@@ -301,7 +290,6 @@ export default function ElectricityPage() {
       if (fetchError) throw fetchError;
 
       if (!recentData || recentData.length === 0) {
-        console.log('No electricity data found for the last 12 months');
         return;
       }
 
@@ -321,9 +309,12 @@ export default function ElectricityPage() {
       const monthlyAverages = Object.values(monthlyTotals).map(
         ({ sum, count }) => sum / count
       );
-      const overallAverage = monthlyAverages.reduce((a, b) => a + b, 0) / monthlyAverages.length;
+      
+      const overallAverage = monthlyAverages.length > 0 
+        ? monthlyAverages.reduce((sum, avg) => sum + avg, 0) / monthlyAverages.length 
+        : 0;
 
-      // Try to update the record first
+      // Update the household data
       const { error: updateError } = await supabase
         .from('households_data')
         .update({ 
@@ -332,27 +323,10 @@ export default function ElectricityPage() {
         })
         .eq('household_id', householdId);
 
-      // If update fails because record doesn't exist, create it
-      if (updateError && updateError.code === 'PGRST116') {
-        const { error: insertError } = await supabase
-          .from('households_data')
-          .insert([{
-            household_id: householdId,
-            electricity: overallAverage,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }]);
-
-        if (insertError) {
-          console.error('Error creating households_data record:', insertError);
-          throw insertError;
-        }
-      } else if (updateError) {
-        console.error('Error updating households_data record:', updateError);
+      if (updateError) {
+        console.error('Error updating household electricity average:', updateError);
         throw updateError;
       }
-
-      console.log('Successfully updated household electricity average:', overallAverage);
     } catch (error) {
       console.error('Error updating household electricity:', error);
       setError('Failed to update household electricity average');
@@ -416,7 +390,6 @@ export default function ElectricityPage() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    console.log('Form field changed:', name, value);
     
     if (name === 'amount') {
       setInputAmount(value === '' ? 0 : Number(value));
