@@ -18,6 +18,7 @@ type FootprintData = {
   air_travel: number;
   food: number;
   stuff: number;
+  services: number;
 };
 
 export default function Home() {
@@ -151,7 +152,8 @@ export default function Home() {
           gasoline: userData?.gasoline || averageData?.gasoline || 0,
           air_travel: userData?.air_travel || averageData?.air_travel || 0,
           food: calculatedFoodCO2e !== null ? calculatedFoodCO2e : (userData?.food || averageData?.food || 0),
-          stuff: userData?.stuff || averageData?.stuff || 0
+          stuff: userData?.stuff || averageData?.stuff || 0,
+          services: userData?.services || averageData?.services || 0
         });
       } catch (error) {
         console.error('Error in fetchHouseholdData:', error);
@@ -181,7 +183,8 @@ export default function Home() {
       userData?.gasoline ? 'Gasoline' : 'Gasoline (avg US)',
       userData?.air_travel ? 'Air Travel' : 'Air Travel (avg US)',
       calculatedFoodCO2e !== null ? 'Food (calculated)' : (userData?.food ? 'Food' : 'Food (avg US)'),
-      userData?.stuff ? 'Stuff' : 'Stuff (avg US)'
+      userData?.stuff ? 'Stuff' : 'Stuff (avg US)',
+      userData?.services ? 'Services' : 'Services (avg US)'
     ],
     datasets: [
       {
@@ -192,7 +195,8 @@ export default function Home() {
           footprintData.gasoline,
           footprintData.air_travel,
           footprintData.food,
-          footprintData.stuff
+          footprintData.stuff,
+          footprintData.services
         ],
         backgroundColor: [
           '#C0C0C0',
@@ -201,7 +205,8 @@ export default function Home() {
           '#4BC0C0',
           '#9966FF',
           '#FF9F40',
-          '#FF6384'
+          '#FF6384',
+          '#8AC249'
         ],
         borderColor: [
           '#C0C0C0',
@@ -210,7 +215,8 @@ export default function Home() {
           '#4BC0C0',
           '#9966FF',
           '#FF9F40',
-          '#FF6384'
+          '#FF6384',
+          '#8AC249'
         ],
         borderWidth: 1,
       },
@@ -262,7 +268,12 @@ export default function Home() {
       <div className="w-full max-w-6xl flex justify-between items-center mb-8">
         <div>
           <h1 className="text-4xl font-bold">Your Carbon Footprint</h1>
-          <p className="text-lg text-gray-600 mt-2">Monthly kg CO2e</p>
+          <p className="text-lg text-gray-600 mt-2">
+            Estimated Monthly kg CO2e: {footprintData ? 
+              (footprintData.electricity + footprintData.natural_gas + footprintData.water + 
+               footprintData.gasoline + footprintData.air_travel + footprintData.food + footprintData.stuff + footprintData.services).toLocaleString() 
+              : 'Loading...'}
+          </p>
         </div>
         <button
           onClick={() => signOut()}
@@ -314,8 +325,12 @@ export default function Home() {
                 <p className="text-sm text-gray-600">Update your food consumption</p>
               </Link>
               <Link href="/footprint/stuff" className="p-4 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
-                <h3 className="font-semibold text-indigo-700">Stuff</h3>
+                <h3 className="font-semibold text-indigo-700">Stuff (coming soon)</h3>
                 <p className="text-sm text-gray-600">Update your material consumption</p>
+              </Link>
+              <Link href="/footprint/services" className="p-4 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
+                <h3 className="font-semibold text-indigo-700">Services (coming soon)</h3>
+                <p className="text-sm text-gray-600">Update your service consumption</p>
               </Link>
               <Link href="/household/details" className="p-4 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
                 <h3 className="font-semibold text-indigo-700">Household Details</h3>
