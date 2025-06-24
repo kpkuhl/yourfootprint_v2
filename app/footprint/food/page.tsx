@@ -32,6 +32,19 @@ type DefaultCI = {
   CI_kg: number;
 };
 
+type RestaurantMeal = {
+  id: number;
+  meal: string;
+  co2e_kg: number;
+};
+
+type RestaurantMealEntry = {
+  meal_id: number;
+  meal_name: string;
+  quantity: number;
+  co2e_kg: number;
+};
+
 const STORAGE_KEY = 'foodFormData';
 
 export default function FoodPage() {
@@ -64,6 +77,8 @@ export default function FoodPage() {
     CI_custom?: number | null;
   }>>([]);
   const [defaultCIValues, setDefaultCIValues] = useState<DefaultCI[]>([]);
+  const [restaurantMeals, setRestaurantMeals] = useState<RestaurantMeal[]>([]);
+  const [restaurantMealEntries, setRestaurantMealEntries] = useState<RestaurantMealEntry[]>([]);
 
   // Fetch household ID for the user
   useEffect(() => {
@@ -146,6 +161,25 @@ export default function FoodPage() {
     };
 
     fetchDefaultCI();
+  }, []);
+
+  // Fetch restaurant meals
+  useEffect(() => {
+    const fetchRestaurantMeals = async () => {
+      const { data, error } = await supabase
+        .from('restaurant_meals')
+        .select('*')
+        .order('meal');
+
+      if (error) {
+        console.error('Error fetching restaurant meals:', error);
+        return;
+      }
+
+      setRestaurantMeals(data || []);
+    };
+
+    fetchRestaurantMeals();
   }, []);
 
   // Function to get carbon intensity for a food item
@@ -321,20 +355,47 @@ export default function FoodPage() {
           console.error('Error inserting food details:', detailsError);
           throw detailsError;
         }
+      }
 
-        // Calculate total CO2e
-        const totalCO2e = foodDetails.reduce((sum, detail) => sum + detail.co2e_kg, 0);
+      // Add restaurant meal entries if type is Restaurant/Take Out
+      if (foodEntry.type === 'Restaurant/Take Out' && restaurantMealEntries.length > 0) {
+        const restaurantDetails = restaurantMealEntries.map(mealEntry => ({
+          household_id: householdId,
+          date: foodEntry.date,
+          item: mealEntry.meal_name,
+          category: 'Restaurant Meal',
+          packaged: false,
+          packaging_type: null,
+          CI_custom: null,
+          co2e_kg: mealEntry.co2e_kg * mealEntry.quantity,
+          food_entry_id: entryData.id,
+          kg_food: mealEntry.quantity
+        }));
 
-        // Update the entry with the total CO2e
-        const { error: updateError } = await supabase
-          .from('food_entries')
-          .update({ co2e: totalCO2e })
-          .eq('id', entryData.id);
+        const { error: restaurantError } = await supabase
+          .from('food_details')
+          .insert(restaurantDetails);
 
-        if (updateError) {
-          console.error('Error updating CO2e:', updateError);
-          throw updateError;
+        if (restaurantError) {
+          console.error('Error inserting restaurant meal details:', restaurantError);
+          throw restaurantError;
         }
+      }
+
+      // Calculate total CO2e from both food details and restaurant meals
+      const foodDetailsCO2e = foodDetails.reduce((sum, detail) => sum + detail.co2e_kg, 0);
+      const restaurantMealsCO2e = restaurantMealEntries.reduce((sum, meal) => sum + (meal.co2e_kg * meal.quantity), 0);
+      const totalCO2e = foodDetailsCO2e + restaurantMealsCO2e;
+
+      // Update the entry with the total CO2e
+      const { error: updateError } = await supabase
+        .from('food_entries')
+        .update({ co2e: totalCO2e })
+        .eq('id', entryData.id);
+
+      if (updateError) {
+        console.error('Error updating CO2e:', updateError);
+        throw updateError;
       }
 
       setSuccess('Food entry saved successfully!');
@@ -347,6 +408,7 @@ export default function FoodPage() {
         co2e: null
       });
       setFoodDetails([]);
+      setRestaurantMealEntries([]);
       setSelectedFile(null);
       setUploadProgress(0);
 
@@ -414,20 +476,47 @@ export default function FoodPage() {
           console.error('Error inserting updated food details:', detailsError);
           throw detailsError;
         }
+      }
 
-        // Calculate total CO2e
-        const totalCO2e = foodDetails.reduce((sum, detail) => sum + detail.co2e_kg, 0);
+      // Add restaurant meal entries if type is Restaurant/Take Out
+      if (foodEntry.type === 'Restaurant/Take Out' && restaurantMealEntries.length > 0) {
+        const restaurantDetails = restaurantMealEntries.map(mealEntry => ({
+          household_id: householdId,
+          date: foodEntry.date,
+          item: mealEntry.meal_name,
+          category: 'Restaurant Meal',
+          packaged: false,
+          packaging_type: null,
+          CI_custom: null,
+          co2e_kg: mealEntry.co2e_kg * mealEntry.quantity,
+          food_entry_id: editingId,
+          kg_food: mealEntry.quantity
+        }));
 
-        // Update the entry with the total CO2e
-        const { error: updateError } = await supabase
-          .from('food_entries')
-          .update({ co2e: totalCO2e })
-          .eq('id', editingId);
+        const { error: restaurantError } = await supabase
+          .from('food_details')
+          .insert(restaurantDetails);
 
-        if (updateError) {
-          console.error('Error updating CO2e:', updateError);
-          throw updateError;
+        if (restaurantError) {
+          console.error('Error inserting restaurant meal details:', restaurantError);
+          throw restaurantError;
         }
+      }
+
+      // Calculate total CO2e from both food details and restaurant meals
+      const foodDetailsCO2e = foodDetails.reduce((sum, detail) => sum + detail.co2e_kg, 0);
+      const restaurantMealsCO2e = restaurantMealEntries.reduce((sum, meal) => sum + (meal.co2e_kg * meal.quantity), 0);
+      const totalCO2e = foodDetailsCO2e + restaurantMealsCO2e;
+
+      // Update the entry with the total CO2e
+      const { error: updateError } = await supabase
+        .from('food_entries')
+        .update({ co2e: totalCO2e })
+        .eq('id', editingId);
+
+      if (updateError) {
+        console.error('Error updating CO2e:', updateError);
+        throw updateError;
       }
 
       setSuccess('Food entry updated successfully!');
@@ -442,6 +531,7 @@ export default function FoodPage() {
         co2e: null
       });
       setFoodDetails([]);
+      setRestaurantMealEntries([]);
       setSelectedFile(null);
       setUploadProgress(0);
 
@@ -499,6 +589,7 @@ export default function FoodPage() {
   const handleEdit = async (entry: FoodEntry) => {
     setEditingId(entry.id!);
     setEditForm(entry);
+    setFoodEntry(entry);
     
     // Fetch food details for this entry
     const { data: details, error } = await supabase
@@ -512,7 +603,24 @@ export default function FoodPage() {
     }
 
     if (details) {
-      setFoodDetails(details);
+      // Separate regular food details from restaurant meals
+      const regularFoodDetails = details.filter(detail => detail.category !== 'Restaurant Meal');
+      const restaurantMealDetails = details.filter(detail => detail.category === 'Restaurant Meal');
+      
+      setFoodDetails(regularFoodDetails);
+      
+      // Convert restaurant meal details back to restaurant meal entries
+      const mealEntries = restaurantMealDetails.map(detail => {
+        const meal = restaurantMeals.find(m => m.meal === detail.item);
+        return {
+          meal_id: meal?.id || 0,
+          meal_name: detail.item,
+          quantity: detail.kg_food || 1,
+          co2e_kg: meal?.co2e_kg || 0
+        };
+      });
+      
+      setRestaurantMealEntries(mealEntries);
     }
   };
 
@@ -686,6 +794,40 @@ export default function FoodPage() {
     
     setFoodDetails(prev => [...prev, ...newFoodDetails]);
     setExtractedItems([]);
+  };
+
+  const addRestaurantMealEntry = () => {
+    if (restaurantMeals.length > 0) {
+      const firstMeal = restaurantMeals[0];
+      setRestaurantMealEntries(prev => [...prev, {
+        meal_id: firstMeal.id,
+        meal_name: firstMeal.meal,
+        quantity: 1,
+        co2e_kg: firstMeal.co2e_kg
+      }]);
+    }
+  };
+
+  const updateRestaurantMealEntry = (index: number, field: keyof RestaurantMealEntry, value: any) => {
+    setRestaurantMealEntries(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      
+      // If updating meal_id, also update meal_name and co2e_kg
+      if (field === 'meal_id') {
+        const selectedMeal = restaurantMeals.find(meal => meal.id === value);
+        if (selectedMeal) {
+          updated[index].meal_name = selectedMeal.meal;
+          updated[index].co2e_kg = selectedMeal.co2e_kg;
+        }
+      }
+      
+      return updated;
+    });
+  };
+
+  const removeRestaurantMealEntry = (index: number) => {
+    setRestaurantMealEntries(prev => prev.filter((_, i) => i !== index));
   };
 
   if (!user) {
@@ -1140,14 +1282,103 @@ export default function FoodPage() {
                   ))}
                 </div>
 
-                {foodDetails.length > 0 && (
+                {/* Restaurant Meals Section - Only show when type is Restaurant/Take Out */}
+                {foodEntry.type === 'Restaurant/Take Out' && (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-lg font-medium">Restaurant Meals</h3>
+                      <button
+                        type="button"
+                        onClick={addRestaurantMealEntry}
+                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                      >
+                        Add Meal
+                      </button>
+                    </div>
+
+                    {restaurantMealEntries.map((mealEntry, index) => (
+                      <div key={index} className="p-4 border rounded-lg space-y-4">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1 space-y-4">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700">
+                                Meal Type
+                              </label>
+                              <select
+                                value={mealEntry.meal_id}
+                                onChange={(e) => updateRestaurantMealEntry(index, 'meal_id', Number(e.target.value))}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                              >
+                                <option value="">Select a meal</option>
+                                {restaurantMeals.map((meal) => (
+                                  <option key={meal.id} value={meal.id}>
+                                    {meal.meal} ({meal.co2e_kg} kg CO2e/meal)
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700">
+                                Quantity
+                              </label>
+                              <input
+                                type="number"
+                                min="1"
+                                step="1"
+                                value={mealEntry.quantity}
+                                onChange={(e) => updateRestaurantMealEntry(index, 'quantity', Number(e.target.value))}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                placeholder="1"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700">
+                                Total CO2e (kg)
+                              </label>
+                              <div className="mt-1 p-2 bg-gray-50 border border-gray-300 rounded-md">
+                                <span className="text-lg font-semibold text-green-600">
+                                  {(mealEntry.co2e_kg * mealEntry.quantity).toFixed(3)} kg CO2e
+                                </span>
+                              </div>
+                              <p className="mt-1 text-sm text-gray-500">
+                                {mealEntry.quantity} × {mealEntry.co2e_kg} kg CO2e/meal
+                              </p>
+                            </div>
+                          </div>
+                          
+                          <button
+                            type="button"
+                            onClick={() => removeRestaurantMealEntry(index)}
+                            className="ml-4 px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+
+                    {restaurantMealEntries.length === 0 && (
+                      <div className="text-center py-8 text-gray-500">
+                        <p>No restaurant meals added yet.</p>
+                        <p className="text-sm mt-1">Click "Add Meal" to get started.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {(foodDetails.length > 0 || restaurantMealEntries.length > 0) && (
                   <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
                     <h3 className="text-lg font-semibold text-blue-800 mb-2">Total Carbon Footprint</h3>
                     <div className="text-2xl font-bold text-blue-600">
-                      {foodDetails.reduce((sum, detail) => sum + detail.co2e_kg, 0).toFixed(3)} kg CO2e
+                      {(foodDetails.reduce((sum, detail) => sum + detail.co2e_kg, 0) + 
+                        restaurantMealEntries.reduce((sum, meal) => sum + (meal.co2e_kg * meal.quantity), 0)).toFixed(3)} kg CO2e
                     </div>
                     <p className="text-sm text-blue-600 mt-1">
-                      Combined carbon footprint of all {foodDetails.length} food item{foodDetails.length !== 1 ? 's' : ''}
+                      Combined carbon footprint of {foodDetails.length} food item{foodDetails.length !== 1 ? 's' : ''}
+                      {foodDetails.length > 0 && restaurantMealEntries.length > 0 ? ' and ' : ''}
+                      {restaurantMealEntries.length > 0 ? `${restaurantMealEntries.length} restaurant meal${restaurantMealEntries.length !== 1 ? 's' : ''}` : ''}
                     </p>
                   </div>
                 )}
