@@ -23,6 +23,7 @@ export default function Home() {
   const { user, signOut } = useAuth();
   const [footprintData, setFootprintData] = useState<FootprintData | null>(null);
   const [userData, setUserData] = useState<any>(null);
+  const [calculatedFoodCO2e, setCalculatedFoodCO2e] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,6 +51,70 @@ export default function Home() {
           throw new Error('No household found for this user');
         }
 
+        // Calculate food CO2e based on actual food entries
+        const calculateFoodCO2e = async (householdId: string) => {
+          // Get all food entries for this household
+          const { data: foodEntries, error: foodError } = await supabase
+            .from('food_entries')
+            .select('*')
+            .eq('household_id', householdId)
+            .order('date', { ascending: true });
+
+          if (foodError) {
+            console.error('Error fetching food entries:', foodError);
+            return null;
+          }
+
+          if (!foodEntries || foodEntries.length === 0) {
+            return null; // No food data available
+          }
+
+          // Group entries by week (Monday to Sunday)
+          const weeklyData: { [weekKey: string]: number[] } = {};
+          
+          foodEntries.forEach(entry => {
+            const date = new Date(entry.date);
+            const dayOfWeek = date.getDay();
+            const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Sunday = 6, Monday = 0
+            const mondayOfWeek = new Date(date);
+            mondayOfWeek.setDate(date.getDate() - daysFromMonday);
+            
+            const weekKey = mondayOfWeek.toISOString().split('T')[0];
+            
+            if (!weeklyData[weekKey]) {
+              weeklyData[weekKey] = [];
+            }
+            
+            if (entry.co2e && entry.co2e > 0) {
+              weeklyData[weekKey].push(entry.co2e);
+            }
+          });
+
+          // Calculate weekly averages
+          const weeklyAverages = Object.values(weeklyData)
+            .filter(weekEntries => weekEntries.length > 0)
+            .map(weekEntries => weekEntries.reduce((sum, co2e) => sum + co2e, 0));
+
+          if (weeklyAverages.length === 0) {
+            return null;
+          }
+
+          // Calculate overall weekly average
+          const averageWeeklyCO2e = weeklyAverages.reduce((sum, weeklyTotal) => sum + weeklyTotal, 0) / weeklyAverages.length;
+
+          // Convert to monthly average (4.347 weeks per month)
+          const monthlyFoodCO2e = averageWeeklyCO2e * 4.347;
+
+          console.log('Food CO2e calculation:', {
+            totalWeeks: weeklyAverages.length,
+            weeklyAverages,
+            averageWeeklyCO2e,
+            monthlyFoodCO2e
+          });
+
+          return monthlyFoodCO2e;
+        };
+
         // Get user's household data
         const { data: userData, error: userDataError } = await supabase
           .from('households_data')
@@ -74,17 +139,24 @@ export default function Home() {
           throw averageDataError;
         }
 
+        // Calculate food CO2e based on actual entries
+        const calculatedFoodCO2e = await calculateFoodCO2e(householdData.id);
+
         // Store user data for label comparison
         setUserData(userData);
 
+        // Store calculated food CO2e
+        setCalculatedFoodCO2e(calculatedFoodCO2e);
+
         // Merge user data with average data, using user data when available
+        // For food, use calculated value if available, otherwise fall back to stored value or average
         setFootprintData({
           electricity: userData?.electricity || averageData?.electricity || 0,
           natural_gas: userData?.natural_gas || averageData?.natural_gas || 0,
           water: userData?.water || averageData?.water || 0,
           gasoline: userData?.gasoline || averageData?.gasoline || 0,
           air_travel: userData?.air_travel || averageData?.air_travel || 0,
-          food: userData?.food || averageData?.food || 0,
+          food: calculatedFoodCO2e !== null ? calculatedFoodCO2e : (userData?.food || averageData?.food || 0),
           stuff: userData?.stuff || averageData?.stuff || 0
         });
       } catch (error) {
@@ -114,7 +186,7 @@ export default function Home() {
       userData?.water ? 'Water' : 'Water (avg US)',
       userData?.gasoline ? 'Gasoline' : 'Gasoline (avg US)',
       userData?.air_travel ? 'Air Travel' : 'Air Travel (avg US)',
-      userData?.food ? 'Food' : 'Food (avg US)',
+      calculatedFoodCO2e !== null ? 'Food (calculated)' : (userData?.food ? 'Food' : 'Food (avg US)'),
       userData?.stuff ? 'Stuff' : 'Stuff (avg US)'
     ],
     datasets: [
