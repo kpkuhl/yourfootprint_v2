@@ -245,6 +245,9 @@ export default function Home() {
         >
           Sign In
         </Link>
+        <p className="text-red-600 text-sm mt-8 text-center max-w-md">
+          This is a personal project in the alpha stage of development, <strong>obviously use at your own risk</strong>. If this is a tool you are interested in using in the future or you have any feedback, please contact me at hello@yourfootprint.house.
+        </p>
         {!hasValidSupabaseConfig && (
           <p className="text-yellow-600 text-sm mt-4 text-center max-w-md">
             ⚠️ Supabase configuration missing. Please add environment variables in Vercel settings.
