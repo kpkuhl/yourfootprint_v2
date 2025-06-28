@@ -166,50 +166,77 @@ export default function HouseholdDetailsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || !householdId) return;
 
     try {
-      // First get the household ID
-      const { data: householdData, error: householdError } = await supabase
-        .from('households')
+      console.log('Saving household details:', details);
+      
+      // First check if households_data record exists
+      const { data: existingData, error: checkError } = await supabase
+        .from('households_data')
         .select('id')
-        .eq('user_id', user.id)
+        .eq('household_id', householdId)
         .single();
 
-      if (householdError) throw householdError;
-      if (!householdData) throw new Error('No household found');
-
-      // Try to update the record first
-      const { error: updateError } = await supabase
-        .from('households_data')
-        .update({
-          household_id: householdData.id,
-          ...details,
-          updated_at: new Date().toISOString()
-        })
-        .eq('household_id', householdData.id);
-
-      // If update fails because record doesn't exist, create it
-      if (updateError && updateError.code === 'PGRST116') {
+      if (checkError && checkError.code === 'PGRST116') {
+        // Record doesn't exist, create it
+        console.log('Creating new households_data record');
         const { error: insertError } = await supabase
           .from('households_data')
           .insert([{
-            household_id: householdData.id,
-            ...details,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            household_id: householdId,
+            name: details.name,
+            num_members: details.num_members,
+            sq_ft: details.sq_ft,
+            num_vehicles: details.num_vehicles,
+            zipcode: details.zipcode,
+            electricity: 0,
+            natural_gas: 0,
+            water: 0,
+            gasoline: 0,
+            air_travel: 0,
+            food: 0,
+            stuff: 0,
+            services: 0,
+            total_monthly_co2e: 0
           }]);
 
-        if (insertError) throw insertError;
-      } else if (updateError) {
-        throw updateError;
+        if (insertError) {
+          console.error('Error creating households_data:', insertError);
+          throw insertError;
+        }
+        
+        console.log('Households_data record created successfully');
+      } else if (checkError) {
+        console.error('Error checking existing households_data:', checkError);
+        throw checkError;
+      } else {
+        // Record exists, update it
+        console.log('Updating existing households_data record');
+        const { error: updateError } = await supabase
+          .from('households_data')
+          .update({
+            name: details.name,
+            num_members: details.num_members,
+            sq_ft: details.sq_ft,
+            num_vehicles: details.num_vehicles,
+            zipcode: details.zipcode
+          })
+          .eq('household_id', householdId);
+
+        if (updateError) {
+          console.error('Error updating households_data:', updateError);
+          throw updateError;
+        }
+        
+        console.log('Households_data record updated successfully');
       }
 
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (error) {
-      console.error('Error updating household details:', error);
-      setError('Failed to update household details');
+      console.error('Error saving household details:', error);
+      setError('Failed to save household details');
     }
   };
 
