@@ -46,13 +46,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const { data: householdData, error: householdError } = await supabase
             .from('households')
             .select('id')
-            .eq('user_id', session.user.id)
-            .single();
+            .eq('user_id', session.user.id);
 
-          if (householdError && householdError.code === 'PGRST116') {
+          if (householdError) {
+            console.error('Error checking household:', householdError);
+          } else if (!householdData || householdData.length === 0) {
             // No household found, create one
             console.log('No household found for user, creating one...');
-            const { data: householdData, error: createError } = await supabase
+            const { data: newHouseholdData, error: createError } = await supabase
               .from('households')
               .insert([{
                 user_id: session.user.id,
@@ -64,14 +65,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (createError) {
               console.error('Error creating household:', createError);
             } else {
-              console.log('Household created successfully:', householdData);
+              console.log('Household created successfully:', newHouseholdData);
               
               // Create default households_data record
-              console.log('Creating households_data for household:', householdData.id);
+              console.log('Creating households_data for household:', newHouseholdData.id);
               const { data: dataResult, error: dataError } = await supabase
                 .from('households_data')
                 .insert([{
-                  household_id: householdData.id,
+                  household_id: newHouseholdData.id,
                   name: '',
                   num_members: 1,
                   sq_ft: 0,
@@ -96,8 +97,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 console.log('Households_data created successfully:', dataResult);
               }
             }
-          } else if (householdError) {
-            console.error('Error checking household:', householdError);
+          } else {
+            console.log('User already has household(s):', householdData.length);
+            // If multiple households exist, log a warning but don't create more
+            if (householdData.length > 1) {
+              console.warn('User has multiple households - this should not happen:', householdData);
+            }
           }
         } catch (error) {
           console.error('Error in household check/creation:', error);

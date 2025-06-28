@@ -50,6 +50,20 @@ export default function SignUp() {
         // Create a household for the new user
         try {
           console.log('Creating household for user:', data.user.id);
+          
+          // First check if user already has a household (shouldn't happen during signup, but safety check)
+          const { data: existingHouseholds, error: checkError } = await supabase
+            .from('households')
+            .select('id')
+            .eq('user_id', data.user.id);
+
+          if (checkError) {
+            console.error('Error checking existing households:', checkError);
+          } else if (existingHouseholds && existingHouseholds.length > 0) {
+            console.log('User already has household(s), skipping creation:', existingHouseholds.length);
+            return; // Don't create duplicate households
+          }
+
           const { data: householdData, error: householdError } = await supabase
             .from('households')
             .insert([{
