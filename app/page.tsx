@@ -38,15 +38,39 @@ export default function Home() {
         setError(null);
 
         // First get the household ID for this user
-        const { data: householdData, error: householdError } = await supabase
+        let { data: householdData, error: householdError } = await supabase
           .from('households')
           .select('id')
           .eq('user_id', user.id)
+          .limit(1)
           .single();
 
         if (householdError) {
           console.error('Error fetching household ID:', householdError);
-          throw householdError;
+          
+          // If no household exists, create one
+          if (householdError.code === 'PGRST116') {
+            console.log('No household found, creating one...');
+            const { data: newHousehold, error: createError } = await supabase
+              .from('households')
+              .insert([{
+                user_id: user.id,
+                created_at: new Date().toISOString()
+              }])
+              .select()
+              .single();
+
+            if (createError) {
+              console.error('Error creating household:', createError);
+              throw createError;
+            }
+
+            console.log('Household created:', newHousehold);
+            // Use the newly created household
+            householdData = newHousehold;
+          } else {
+            throw householdError;
+          }
         }
 
         if (!householdData) {
