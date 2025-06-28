@@ -54,8 +54,7 @@ export default function SignUp() {
             .from('households')
             .insert([{
               user_id: data.user.id,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
+              created_at: new Date().toISOString()
             }])
             .select()
             .single();
