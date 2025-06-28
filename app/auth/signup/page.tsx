@@ -49,6 +49,7 @@ export default function SignUp() {
         
         // Create a household for the new user
         try {
+          console.log('Creating household for user:', data.user.id);
           const { data: householdData, error: householdError } = await supabase
             .from('households')
             .insert([{
@@ -64,10 +65,11 @@ export default function SignUp() {
             // Don't throw here - the user was created successfully
             // The household can be created later if needed
           } else {
-            console.log('Household created successfully for user:', data.user.id);
+            console.log('Household created successfully:', householdData);
             
             // Create default households_data record
-            const { error: dataError } = await supabase
+            console.log('Creating households_data for household:', householdData.id);
+            const { data: dataResult, error: dataError } = await supabase
               .from('households_data')
               .insert([{
                 household_id: householdData.id,
@@ -85,12 +87,14 @@ export default function SignUp() {
                 stuff: 0,
                 services: 0,
                 total_monthly_co2e: 0
-              }]);
+              }])
+              .select();
 
             if (dataError) {
               console.error('Error creating households_data:', dataError);
+              console.error('Error details:', JSON.stringify(dataError, null, 2));
             } else {
-              console.log('Households_data created successfully for household:', householdData.id);
+              console.log('Households_data created successfully:', dataResult);
             }
           }
         } catch (householdError) {

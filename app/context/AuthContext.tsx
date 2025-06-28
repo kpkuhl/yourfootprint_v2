@@ -65,10 +65,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (createError) {
               console.error('Error creating household:', createError);
             } else {
-              console.log('Household created successfully for user:', session.user.id);
+              console.log('Household created successfully:', householdData);
               
               // Create default households_data record
-              const { error: dataError } = await supabase
+              console.log('Creating households_data for household:', householdData.id);
+              const { data: dataResult, error: dataError } = await supabase
                 .from('households_data')
                 .insert([{
                   household_id: householdData.id,
@@ -86,12 +87,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   stuff: 0,
                   services: 0,
                   total_monthly_co2e: 0
-                }]);
+                }])
+                .select();
 
               if (dataError) {
                 console.error('Error creating households_data:', dataError);
+                console.error('Error details:', JSON.stringify(dataError, null, 2));
               } else {
-                console.log('Households_data created successfully for household:', householdData.id);
+                console.log('Households_data created successfully:', dataResult);
               }
             }
           } else if (householdError) {
