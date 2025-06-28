@@ -46,6 +46,29 @@ export default function SignUp() {
 
       if (data?.user) {
         console.log('User created successfully:', data.user);
+        
+        // Create a household for the new user
+        try {
+          const { error: householdError } = await supabase
+            .from('households')
+            .insert([{
+              user_id: data.user.id,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }]);
+
+          if (householdError) {
+            console.error('Error creating household:', householdError);
+            // Don't throw here - the user was created successfully
+            // The household can be created later if needed
+          } else {
+            console.log('Household created successfully for user:', data.user.id);
+          }
+        } catch (householdError) {
+          console.error('Error in household creation:', householdError);
+          // Don't throw here - the user was created successfully
+        }
+        
         // Redirect to home page after successful signup
         router.push('/');
         router.refresh();
