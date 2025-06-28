@@ -66,6 +66,36 @@ export default function Home() {
             }
 
             console.log('Household created:', newHousehold);
+            
+            // Create default households_data record for the new household
+            const { error: dataError } = await supabase
+              .from('households_data')
+              .insert([{
+                household_id: newHousehold.id,
+                name: '',
+                num_members: 1,
+                sq_ft: 0,
+                num_vehicles: 0,
+                zipcode: '',
+                electricity: 0,
+                natural_gas: 0,
+                water: 0,
+                gasoline: 0,
+                air_travel: 0,
+                food: 0,
+                stuff: 0,
+                services: 0,
+                total_monthly_co2e: 0,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              }]);
+
+            if (dataError) {
+              console.error('Error creating households_data:', dataError);
+            } else {
+              console.log('Households_data created for new household');
+            }
+            
             // Use the newly created household
             householdData = newHousehold;
           } else {

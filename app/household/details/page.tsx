@@ -31,22 +31,82 @@ export default function HouseholdDetailsPage() {
       if (!user) return;
 
       try {
+        console.log('Fetching household ID for user:', user.id);
         const { data: householdData, error } = await supabase
           .from('households')
           .select('id')
           .eq('user_id', user.id)
+          .limit(1)
           .single();
 
         if (error) {
           console.error('Error fetching household ID:', error);
+          
+          // If no household exists, create one
+          if (error.code === 'PGRST116') {
+            console.log('No household found, creating one...');
+            const { data: newHousehold, error: createError } = await supabase
+              .from('households')
+              .insert([{
+                user_id: user.id,
+                created_at: new Date().toISOString()
+              }])
+              .select()
+              .single();
+
+            if (createError) {
+              console.error('Error creating household:', createError);
+              setError('Failed to create household');
+              setLoading(false);
+              return;
+            }
+
+            console.log('Household created:', newHousehold);
+            setHouseholdId(newHousehold.id);
+            
+            // Create default households_data record
+            const { error: dataError } = await supabase
+              .from('households_data')
+              .insert([{
+                household_id: newHousehold.id,
+                name: '',
+                num_members: 1,
+                sq_ft: 0,
+                num_vehicles: 0,
+                zipcode: '',
+                electricity: 0,
+                natural_gas: 0,
+                water: 0,
+                gasoline: 0,
+                air_travel: 0,
+                food: 0,
+                stuff: 0,
+                services: 0,
+                total_monthly_co2e: 0,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              }]);
+
+            if (dataError) {
+              console.error('Error creating households_data:', dataError);
+            } else {
+              console.log('Households_data created for new household');
+            }
+          } else {
+            setError('Failed to fetch household');
+            setLoading(false);
+          }
           return;
         }
 
         if (householdData) {
+          console.log('Household found:', householdData.id);
           setHouseholdId(householdData.id);
         }
       } catch (error) {
         console.error('Error in fetchHouseholdId:', error);
+        setError('Failed to fetch household');
+        setLoading(false);
       }
     };
 
@@ -58,6 +118,7 @@ export default function HouseholdDetailsPage() {
       if (!user || !householdId) return;
 
       try {
+        console.log('Fetching household details for household:', householdId);
         const { data, error } = await supabase
           .from('households_data')
           .select('*')
@@ -66,10 +127,13 @@ export default function HouseholdDetailsPage() {
 
         if (error && error.code !== 'PGRST116') {
           console.error('Error fetching household details:', error);
+          setError('Failed to fetch household details');
+          setLoading(false);
           return;
         }
 
         if (data) {
+          console.log('Household details found:', data);
           setDetails({
             name: data.name || '',
             num_members: data.num_members || 1,
@@ -78,6 +142,7 @@ export default function HouseholdDetailsPage() {
             sq_ft: data.sq_ft || 0
           });
         } else {
+          console.log('No household details found, using defaults');
           // Set default values if no data exists
           setDetails({
             name: '',
@@ -87,8 +152,12 @@ export default function HouseholdDetailsPage() {
             sq_ft: 0
           });
         }
+        
+        setLoading(false);
       } catch (error) {
         console.error('Error in fetchDetails:', error);
+        setError('Failed to fetch household details');
+        setLoading(false);
       }
     };
 
