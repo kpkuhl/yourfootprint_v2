@@ -99,7 +99,9 @@ export default function SignUp() {
                 food: 0,
                 stuff: 0,
                 services: 0,
-                total_monthly_co2e: 0
+                total_monthly_co2e: 0,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
               }])
               .select();
 
